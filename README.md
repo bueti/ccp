@@ -1,2 +1,3 @@
-# ccp
-Concurrent C Programming
+# Concurrent C Programming
+
+Benjamin Buetikofer
