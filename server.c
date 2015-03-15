@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+<<<<<<< HEAD
 #include "server_optparse.h"
 
 /*
