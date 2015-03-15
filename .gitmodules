@@ -1,0 +1,3 @@
+[submodule "zhaw_concurrent_c_programming_fs_2015"]
+	path = zhaw_concurrent_c_programming_fs_2015
+	url = git@github.com:telmich/zhaw_concurrent_c_programming_fs_2015.git
