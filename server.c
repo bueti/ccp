@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-<<<<<<< HEAD
 #include "server_optparse.h"
 
 /*
@@ -31,7 +30,7 @@ int main(int argc, char *argv[])
 {
      // Parse command line
     if(!optparse(argc, argv))
-        abort();
+        exit(1);
 
     printf("size is: %d\n", n);
     return 0;

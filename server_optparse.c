@@ -13,7 +13,7 @@ void usage() {
  * Prints instructions when user arguments are inconsistent */
 _Bool optparse(int argc, char *argv[]) {
   int index;
-  int c;
+  int opt;
 
   opterr = 0;
 
@@ -22,11 +22,8 @@ _Bool optparse(int argc, char *argv[]) {
     return false;
   }
 
-  while ((c = getopt (argc, argv, "h:n")) != -1)
-    switch (c) {
-      case 'h':
-        usage();
-        break;
+  while ((opt = getopt (argc, argv, "n:")) != -1)
+    switch (opt) {
       case 'n':
         n = atoi(optarg);
         break;
