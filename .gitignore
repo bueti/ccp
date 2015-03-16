@@ -33,3 +33,8 @@ client
 # CLion files
 .idea
 CMakelists.txt
+
+build
+lib/*
+bin/*
+.DS_Store
