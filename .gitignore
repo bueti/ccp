@@ -29,3 +29,7 @@
 *.hex
 server
 client
+
+# CLion files
+.idea
+CMakelists.txt
