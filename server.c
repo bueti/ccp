@@ -11,6 +11,7 @@
 
 #define PORT "1666"
 #define BACKLOG 10
+#define MAXBUFLEN 255
 
 /*
 * Global Vars
@@ -100,6 +101,8 @@ int start_server() {
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
+    char buf[MAXBUFLEN];
+    int numbytes;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -167,12 +170,24 @@ int start_server() {
         inet_ntop(their_addr.ss_family,
                 get_in_addr((struct sockaddr *)&their_addr),
                 s, sizeof s);
-        printf("server: %s connected!\n", s);
+
+        printf("server: got packet from %s\n",
+                inet_ntop(their_addr.ss_family,
+                        get_in_addr((struct sockaddr *)&their_addr),
+                        s, sizeof s));
+        printf("listener: packet is %d bytes long\n", numbytes);
+        buf[numbytes] = '\0';
+        printf("listener: packet contains \"%s\"\n", buf);
 
         if (!fork()) { // this is the child process
             close(sockfd); // child doesn't need the listener
-            if (send(new_fd, "Hello, world!", 13, 0) == -1)
+            char msg[] = "Hello to the coolest game ever!\n";
+            if (send(new_fd, msg, sizeof(msg), 0) == -1)
                 perror("send");
+            // wait and process input
+            while(1) {
+                sleep(1);
+            }
             close(new_fd);
             exit(0);
         }

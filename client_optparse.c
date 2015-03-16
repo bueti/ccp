@@ -6,7 +6,7 @@
 #include "client_optparse.h"
 
 void usage() {
-  printf("valid arguments: -n (name)\n");
+  printf("valid arguments: -n (name), -h (hostname), -p (port)\n");
 }
 
 /* Retrieves the size of the board
@@ -22,14 +22,17 @@ _Bool optparse(int argc, char *argv[]) {
     return false;
   }
 
-  while ((c = getopt (argc, argv, "h:n")) != -1)
+  while ((c = getopt (argc, argv, "h:n:p:")) != -1)
     switch (c)
     {
-      case 'h':
-        usage();
-        break;
       case 'n':
         name = optarg;
+        break;
+      case 'h':
+        hostname = optarg;
+        break;
+      case 'p':
+        port = optarg;
         break;
       case '?':
         if (isprint (optopt))
