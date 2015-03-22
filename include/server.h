@@ -4,7 +4,7 @@
 typedef struct {
     int pos_x;
     int pos_y;
-    char* owner;
+    char owner[];
 } cell_t;
 
 typedef struct {

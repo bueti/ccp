@@ -200,7 +200,7 @@ _Bool populate_board(board_t *board) {
     int i, j;
     for (i = 0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
-            board->cells[i][j].owner = NULL;
+            strcpy(board->cells[i][j].owner, "");
         }
     }
     return true;
@@ -209,7 +209,7 @@ _Bool populate_board(board_t *board) {
 void print_board(board_t *board) {
     int i, j;
 
-    for (i = 0; i<board->n; i++) {
+    for (i=0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
             printf("%s", board->cells[i][j].owner);
         }
