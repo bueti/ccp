@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "server_optparse.h"
 
@@ -22,7 +24,9 @@ int n = 0;
 * My Structs
 */
 typedef struct {
-    _Bool occupied;
+    int pos_x;
+    int pos_y;
+    char* owner;
 } cell_t;
 
 typedef struct {
@@ -36,7 +40,7 @@ typedef struct {
 
 typedef struct {
     int id;
-    player_t player;
+    player_t **player;
 } players_t;
 
 /*
@@ -49,6 +53,7 @@ void alloc_cell_mem_ptrs(board_t *board);
 _Bool init_board(board_t *board);
 _Bool populate_board(board_t *board);
 void print_board(board_t *board);
+_Bool handle_incoming(int fd);
 
 void sigchld_handler(int s) {
     while(waitpid(-1, NULL, WNOHANG) > 0);
@@ -181,15 +186,18 @@ int start_server() {
 
         if (!fork()) { // this is the child process
             close(sockfd); // child doesn't need the listener
-            char msg[] = "Hello to the coolest game ever!\n";
-            if (send(new_fd, msg, sizeof(msg), 0) == -1)
-                perror("send");
-            // wait and process input
-            while(1) {
-                sleep(1);
+            //char msg[] = "Hello to the coolest game ever!\n";
+            //if (send(new_fd, msg, sizeof(msg), 0) == -1)
+            //    perror("send");
+            if(handle_incoming(new_fd)) {
+                // successfull
+                close(new_fd);
+                exit(0);
+            } else {
+               // error handling
+                close(new_fd);
+                exit(-1);
             }
-            close(new_fd);
-            exit(0);
         }
         close(new_fd);  // parent doesn't need this
     }
@@ -223,7 +231,7 @@ _Bool populate_board(board_t *board) {
     int i, j;
     for (i = 0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
-            board->cells[i][j].occupied = false;
+            board->cells[i][j].owner = NULL;
         }
     }
     return true;
@@ -234,12 +242,12 @@ void print_board(board_t *board) {
 
     for (i = 0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
-            if(board->cells[i][j].occupied) {
-                printf("o");
-            } else {
-                printf("f");
-            }
+            printf("%s", board->cells[i][j].owner);
         }
         printf("\n");
     }
+}
+
+_Bool handle_incoming(int fd) {
+    return true;
 }
