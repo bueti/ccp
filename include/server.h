@@ -4,7 +4,8 @@
 typedef struct {
     int pos_x;
     int pos_y;
-    char owner[];
+    pthread_rwlock_t lock;
+    char owner[]; // TODO: should be player_t
 } cell_t;
 
 typedef struct {

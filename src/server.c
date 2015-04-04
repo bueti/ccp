@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #include "server.h"
 #include "server_optparse.h"
@@ -201,6 +202,10 @@ _Bool populate_board(board_t *board) {
     for (i = 0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
             strcpy(board->cells[i][j].owner, "");
+            if (pthread_rwlock_init(&board->cells[i][j].lock, NULL) != 0) {
+                printf("%d/%d: mutex init failed\n", i, j);
+                return 1;
+            }
         }
     }
     return true;
