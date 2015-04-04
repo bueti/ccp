@@ -5,7 +5,7 @@ SRCDIR := src
 CFLAGS := -g -Wall -Wpedantic -Wextra -O2 -std=gnu99
 INC := -I ./include -L ./lib
 
-all: server client
+.PHONY all: server client
 
 server:
 	@echo " Building Server..."
@@ -15,6 +15,6 @@ client:
 	@echo " Building Client..."
 	@echo " $(CC) $(CFLAGS) $(INC) $(SRCDIR)/client.c $(SRCDIR)/client_optparse.c -o $(TARGETDIR)/client"; $(CC) $(CFLAGS) $(INC) $(SRCDIR)/client.c $(SRCDIR)/client_optparse.c -o $(TARGETDIR)/client;
 
-clean:
+.PHONY clean:
 	@echo " Cleaning...";
 	@echo " $(RM) -r $(TARGETDIR)/*"; $(RM) -r $(TARGETDIR)/*
