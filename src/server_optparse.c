@@ -22,10 +22,13 @@ _Bool optparse(int argc, char *argv[]) {
     return false;
   }
 
-  while ((opt = getopt (argc, argv, "n:")) != -1)
+  while ((opt = getopt (argc, argv, "n:d")) != -1)
     switch (opt) {
       case 'n':
         n = atoi(optarg);
+        break;
+      case 'd':
+        debug = true;
         break;
       case '?':
         if (isprint (optopt))

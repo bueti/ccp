@@ -34,3 +34,4 @@ _Bool populate_board(board_t *board);
 void print_board(board_t *board);
 _Bool handle_incoming(int fd);
 _Bool *read_cell(board_t *board, int x, int y);
+_Bool wait_for_connections(board_t *board);

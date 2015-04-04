@@ -16,22 +16,16 @@
 
 #define PORT "1666"
 #define BACKLOG 10
-#define MAXBUFLEN 255
+#define MAXBUFLEN 256
 
 /*
 * Global Vars
 */
 int n = 0;
+_Bool debug = false;
 
-/**
- * Signal Handler
- */
-void sigchld_handler(int s) {
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-}
-
-// get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa) {
+void *get_in_addr(struct sockaddr *sa)
+{
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
     }
@@ -55,124 +49,183 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    if(!populate_board(&board)) {
-        printf("error populating board!\n");
-        exit(-1);
-    }
+//    if(!populate_board(&board)) {
+//        printf("error populating board!\n");
+//        exit(-1);
+//    }
 
-    print_board(&board);
-    start_server();
+    if(debug)
+        print_board(&board);
 
+    _Bool retcode = wait_for_connections(&board);
 
-    return 0;
+    return retcode;
 }
 
-int start_server() {
-    // from http://beej.us/guide/bgnet/output/html/multipage/clientserver.html
-    int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
-    struct addrinfo hints, *servinfo, *p;
-    struct sockaddr_storage their_addr; // connector's address information
-    socklen_t sin_size;
-    struct sigaction sa;
-    int yes=1;
-    char s[INET6_ADDRSTRLEN];
-    int rv;
-    char buf[MAXBUFLEN];
-    int numbytes = 0;
+_Bool wait_for_connections(board_t *board) {
+    _Bool started = false;
 
+    fd_set master;
+    fd_set read_fds;
+    int fdmax;
+
+    int listener;
+    int newfd;
+    struct sockaddr_storage remoteaddr;
+    socklen_t addrlen;
+
+    char buf[MAXBUFLEN];
+    int nbytes;
+
+    char remoteIP[INET6_ADDRSTRLEN];
+
+    int yes=1;
+    int i,j,rv;
+
+    struct addrinfo hints, *ai, *p;
+
+    FD_ZERO(&master);
+    FD_ZERO(&read_fds);
+
+    // get a socket and bind it
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
+        exit(1);
     }
 
     // loop through all the results and bind to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("server: socket");
+    for(p = ai; p != NULL; p = p->ai_next) {
+        listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if(listener < 0) {
             continue;
         }
 
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-                sizeof(int)) == -1) {
-            perror("setsockopt");
-            exit(1);
-        }
+        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
 
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("server: bind");
+        if (bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
+            close(listener);
             continue;
         }
 
         break;
     }
 
-    if (p == NULL)  {
-        fprintf(stderr, "server: failed to bind\n");
-        return 2;
+    // if we get here we cloudnt bind to a socket
+    if (p == NULL) {
+        fprintf(stderr, "listener: failed to bind socket\n");
+        exit(2);
     }
 
-    freeaddrinfo(servinfo); // all done with this structure
+    freeaddrinfo(ai); // clean up, not used anymore
 
-    if (listen(sockfd, BACKLOG) == -1) {
+    printf("listener: waiting to recvfrom...\n");
+
+    // listen
+    if(listen(listener, BACKLOG) == -1) {
         perror("listen");
-        exit(1);
+        exit(3);
     }
 
-    sa.sa_handler = sigchld_handler; // reap all dead processes
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        perror("sigaction");
-        exit(1);
-    }
+    // add listener to the master set
+    FD_SET(listener, &master);
 
-    printf("server: waiting for connections...\n");
+    // keep track of the biggest fd
+    fdmax = listener;
 
-    while(1) {  // main accept() loop
-        sin_size = sizeof their_addr;
-        new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-        if (new_fd == -1) {
-            perror("accept");
-            continue;
+
+    // main loop
+    while(true) {
+        read_fds = master;
+        if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) {
+            perror("select");
+            exit(4);
         }
 
-        inet_ntop(their_addr.ss_family,
-                get_in_addr((struct sockaddr *)&their_addr),
-                s, sizeof s);
+        // run through the existing connections looking for data to read
+        for(i = 0; i <= fdmax; i++) {
+            if (FD_ISSET(i, &read_fds)) { // we got one!!
+                if (i == listener) {
+                    // handle new connections
+                    addrlen = sizeof remoteaddr;
+                    newfd = accept(listener,
+                        (struct sockaddr *)&remoteaddr,
+                        &addrlen);
 
-        printf("server: got packet from %s\n",
-                inet_ntop(their_addr.ss_family,
-                        get_in_addr((struct sockaddr *)&their_addr),
-                        s, sizeof s));
-        printf("listener: packet is %d bytes long\n", numbytes);
-        buf[numbytes] = '\0';
-        printf("listener: packet contains \"%s\"\n", buf);
+                    if (newfd == -1) {
+                        perror("accept");
+                    } else {
+                        FD_SET(newfd, &master); // add to master set
+                        if (newfd > fdmax) {    // keep track of the max
+                            fdmax = newfd;
+                        }
+                        printf("server: new connection from %s on "
+                            "socket %d\n",
+                            inet_ntop(remoteaddr.ss_family,
+                                get_in_addr((struct sockaddr*)&remoteaddr),
+                                remoteIP, INET6_ADDRSTRLEN),
+                            newfd);
+                    }
+                } else {
+                    // handle data from a client
+                    if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
+                        // got error or connection closed by client
+                        if (nbytes == 0) {
+                            // connection closed
+                            printf("server: socket %d hung up\n", i);
+                        } else {
+                            perror("recv");
+                        }
+                        close(i); // bye!
+                        FD_CLR(i, &master); // remove from master set
+                    } else {
+                        // we got some data from a client
+                        if(debug) {
+                            printf("client %d sent %s\n", i, buf);
+                        }
+                        if(strcmp(buf, HELLO)) {
+                            // always send the size as a response to HELLO
+                            char *res = NULL;
+                            if(asprintf(&res, "%s %d\n", SIZE, board->n) != 0)
+                                exit(1);
 
-        if (!fork()) { // this is the child process
-            close(sockfd); // child doesn't need the listener
-            //char msg[] = "Hello to the coolest game ever!\n";
-            //if (send(new_fd, msg, sizeof(msg), 0) == -1)
-            //    perror("send");
-            if(handle_incoming(new_fd)) {
-                // successfull
-                close(new_fd);
-                exit(0);
-            } else {
-               // error handling
-                close(new_fd);
-                exit(-1);
-            }
-        }
-        close(new_fd);  // parent doesn't need this
-    }
+                            if(send(i, res, sizeof(res), 0) == -1) {
+                                perror("send");
+                            }
 
+                            // send start when we have n/2 connections,
+                            // otherwise send it only to the new guy
+                            if((fdmax-3) >= board->n/2 && !started) {
+
+                                for(j = 0; j <= fdmax; j++) {
+                                    // send to everyone!
+                                    if (FD_ISSET(j, &master)) {
+                                        // except the listener
+                                        if (j != listener) {
+                                            if (send(j, START, sizeof(START), 0) == -1) {
+                                                perror("send");
+                                            }
+                                        }
+                                    }
+                                }
+                                started = true;
+                            } else if ((fdmax-3) >= board->n/2) {
+                                if(send(i, START, sizeof(START), 0) == -1) {
+                                    perror("send");
+                                }
+                            }
+                        }
+                    }
+                } // END handle data from client
+            } // END got new incoming connection
+        } // END looping through file descriptors
+    } // END while
+
+    return 0;
 }
 
 
@@ -194,7 +247,9 @@ _Bool init_board(board_t *board) {
        if(!(board->cells[i] = (cell_t *) malloc(sizeof(cell_t *) * board->n)))
             return false;
     }
-    printf("size is: %d\n", board->n);
+
+    if(debug)
+        printf("size is: %d\n", board->n);
 
     return true;
 }
@@ -226,7 +281,14 @@ void print_board(board_t *board) {
 }
 
 _Bool handle_incoming(int fd) {
-    printf("%s\n", COMMANDS[0]);
+    int numbytes;
+    char buf[MAXBUFLEN];
+    if ((numbytes = recv(fd, buf, MAXBUFLEN-1, 0)) == -1) {
+        perror("recv");
+        exit(1);
+    }
+
+    printf("%s\n", buf);
     if (send(fd, COMMANDS[0], sizeof(COMMANDS[0]), 0) == -1)
         perror("send");
     return true;
@@ -245,4 +307,13 @@ _Bool *read_cell(board_t *board, int x, int y) {
         }
     }
     return false; // if we cant lock the cell it's already taken
+}
+
+
+char* concat(char *s1, char *s2) {
+    char *result = malloc(strlen(s1)+strlen(s2)+1);//+1 for the zero-terminator
+    //in real code you would check for errors in malloc here
+    strcpy(result, s1);
+    strcat(result, s2);
+    return result;
 }
