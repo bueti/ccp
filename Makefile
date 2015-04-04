@@ -2,7 +2,7 @@ CC := gcc
 TARGETDIR := bin
 SRCDIR := src
 
-CFLAGS := -g -Wall -Wpedantic -Wextra -O2 -std=gnu99
+CFLAGS := -g -Wall -Wpedantic -Wextra -O2 -std=gnu99 -pthread
 INC := -I ./include -L ./lib
 
 .PHONY all: server client

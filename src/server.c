@@ -12,6 +12,7 @@
 
 #include "server.h"
 #include "server_optparse.h"
+#include "commands.h"
 
 #define PORT "1666"
 #define BACKLOG 10
@@ -77,7 +78,7 @@ int start_server() {
     char s[INET6_ADDRSTRLEN];
     int rv;
     char buf[MAXBUFLEN];
-    int numbytes;
+    int numbytes = 0;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -174,6 +175,17 @@ int start_server() {
 
 }
 
+
+void alloc_cell_mem_ptrs(board_t *board) {
+    board->cells = (cell_t**)malloc(board->n * sizeof(cell_t*));
+
+    int i;
+    for (i = 0; i < board->n; ++i) {
+        board->cells[i] = (cell_t*)malloc(board->n * sizeof(cell_t*));
+    }
+
+}
+
 _Bool init_board(board_t *board) {
     // allocate memory for the data of all cells on the board
     board->cells = (cell_t **) malloc(sizeof (cell_t *) * board->n);
@@ -187,22 +199,13 @@ _Bool init_board(board_t *board) {
     return true;
 }
 
-void alloc_cell_mem_ptrs(board_t *board) {
-    board->cells = (cell_t**)malloc(board->n * sizeof(cell_t*));
-
-    int i;
-    for (i = 0; i < board->n; ++i) {
-        board->cells[i] = (cell_t*)malloc((board->n * sizeof(cell_t*)));
-    }
-
-}
-
 _Bool populate_board(board_t *board) {
     int i, j;
     for (i = 0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
             strcpy(board->cells[i][j].owner, "");
-            if (pthread_rwlock_init(&board->cells[i][j].lock, NULL) != 0) {
+            int retcode = pthread_rwlock_init(&board->cells[i][j].lock, NULL);
+            if (retcode != 0) {
                 printf("%d/%d: mutex init failed\n", i, j);
                 return 1;
             }
@@ -223,5 +226,23 @@ void print_board(board_t *board) {
 }
 
 _Bool handle_incoming(int fd) {
+    printf("%s\n", COMMANDS[0]);
+    if (send(fd, COMMANDS[0], sizeof(COMMANDS[0]), 0) == -1)
+        perror("send");
     return true;
+}
+
+
+_Bool *read_cell(board_t *board, int x, int y) {
+
+    if (pthread_rwlock_rdlock(&board->cells[x][y].lock) < 0) {
+        perror("rdlock");
+    } else {
+        strcpy(board->cells[x][y].owner, "foo");
+        if (pthread_rwlock_unlock(&board->cells[x][y].lock) != 0) {
+            perror("reader thread: pthred_rwlock_unlock error");
+            exit(__LINE__);
+        }
+    }
+    return false; // if we cant lock the cell it's already taken
 }
