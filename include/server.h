@@ -22,6 +22,12 @@ typedef struct {
     player_t **player;
 } players_t;
 
+typedef struct {
+    int fd;
+    int shm_fd;
+    int id;
+} data_t;
+
 /*
 * My functions
 */
@@ -35,3 +41,6 @@ void print_board(board_t *board);
 _Bool handle_incoming(int fd);
 _Bool *read_cell(board_t *board, int x, int y);
 _Bool wait_for_connections(board_t *board);
+void *game_thread(data_t *data);
+void end_checker(data_t *data);
+void *get_in_addr(struct sockaddr *sa);
