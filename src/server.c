@@ -360,13 +360,18 @@ void *game_thread(void *arg) {
 
             board.num_players--;
     } else {
-            if(debug) {
-                printf("client %d sent %s\n", player->fd, buf);
-                syslog (LOG_INFO, "client %d sent %s, number of players: %d, game in progress: %d", player->fd, buf, board.num_players, board.game_in_progress);
-            }
             // Parse incoming data and respond accordingly
             char *res = NULL;
-            if(sscanf(buf, HELLO) == 0) {
+
+            // Remove \r\n from buffer. \r\n is added by telnet when manually talk to the server
+            char *data = strip_copy(buf);
+
+            if(debug) {
+                printf("client %d sent %s\n", player->fd, data);
+                syslog (LOG_INFO, "client %d sent %s, number of players: %d, game in progress: %d", player->fd, data, board.num_players, board.game_in_progress);
+            }
+
+            if(strcmp(data, HELLO) == 0) {
                 // always send the size as a response to HELLO
                 if(asprintf(&res, "%s %d\n", SIZE, board.n) == -1)
                     exit(1);
@@ -400,20 +405,31 @@ void *game_thread(void *arg) {
                         return NULL;
                     }
                 }
-            }
+            } else if (strncmp(buf, TAKE, 4) == 0) {
+                if(debug) {
+                    printf("TAKE: client %d sent %s\n", player->fd, data);
+                    syslog (LOG_DEBUG, "client %d sent %s", player->fd, data);
+                }
+                int x, y;
+                char cmd[20];
+                int n = sscanf(data, "%s %d %d", cmd, &x, &y);
 
-            int x, y;
-            int n = sscanf(buf, TAKE, &x, &y);
-            if(n == 2) {
-                if(take_cell(player, x, y)) {
-                    printf("Cell at %d, %d successfully taken!\n", x, y);
-                    if (send(player->fd, TAKEN, sizeof(TAKEN), 0) == -1) {
-                        perror("send TAKEN");
+                if(debug) {
+                    printf("take: n = %d\n", n);
+                }
+
+                if(n == 3) {
+                    if(take_cell(player, x, y)) {
+                        printf("Cell at %d, %d successfully taken!\n", x, y);
+                        if (send(player->fd, TAKEN, sizeof(TAKEN), 0) == -1) {
+                            perror("send TAKEN");
+                        }
+                    } else {
+                        // already taken
                     }
-                } else {
-                    // already taken
                 }
             }
+
         }
 
     }
@@ -421,5 +437,23 @@ void *game_thread(void *arg) {
 }
 
 _Bool take_cell(player_t *player, int x, int y) {
+    // TODO....
     return true;
+}
+
+// from http://stackoverflow.com/questions/1515195/how-to-remove-n-or-t-from-a-given-string-in-c
+char *strip_copy(const char *s) {
+    char *p = malloc(strlen(s) + 1);
+    if(p) {
+        char *p2 = p;
+        while(*s != '\0') {
+            if(*s != '\r' && *s != '\n') {
+                *p2++ = *s++;
+            } else {
+                ++s;
+            }
+        }
+        *p2 = '\0';
+    }
+    return p;
 }

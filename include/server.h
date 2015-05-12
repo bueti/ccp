@@ -44,6 +44,7 @@ _Bool handle_incoming(int fd);
 _Bool *read_cell(board_t *board, int x, int y);
 void *get_in_addr(struct sockaddr *sa);
 _Bool take_cell(player_t *player, int x, int y);
+char *strip_copy(const char *s);
 // Thread runs
 void* end_checker(void *arg);
 void* connection_handler(void *arg);
