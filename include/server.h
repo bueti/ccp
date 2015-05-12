@@ -1,35 +1,35 @@
 /*
-* My Structs
-*/
+ * structs
+ */
+typedef struct {
+    char * name;
+    int id;
+    int fd;
+    pthread_t tid;
+} player_t;
+
 typedef struct {
     int pos_x;
     int pos_y;
-    pthread_rwlock_t lock;
-    char owner[]; // TODO: should be player_t
+    pthread_mutex_t mutex;
+    player_t * player;
 } cell_t;
 
 typedef struct {
     int n;
     cell_t **cells;
+    int num_players;
 } board_t;
-
-typedef struct {
-    char * name;
-} player_t;
-
-typedef struct {
-    int id;
-    player_t **player;
-} players_t;
 
 typedef struct {
     int fd;
     int shm_fd;
     int id;
+    char* buf;
 } data_t;
 
 /*
-* My functions
+* functions
 */
 void sigchld_handler(int s);
 void *get_ind_addr(struct sockaddr);

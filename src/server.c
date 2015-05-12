@@ -23,6 +23,11 @@
 /* Global Vars */
 int n = 0;
 _Bool debug = false;
+board_t board;
+
+pthread_cond_t start_barrier;
+fd_set master;
+__thread player_t* player;
 
 /* main */
 int main(int argc, char *argv[]) {
@@ -43,7 +48,6 @@ int main(int argc, char *argv[]) {
         syslog (LOG_DEBUG, "server_pid: %d", server_pid);
     }
 
-    board_t board;
     board.n = n;
 
     /* Allocate cell memory */
@@ -55,11 +59,11 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    if(!populate_board(&board)) {
-        printf("error populating board!\n");
-        syslog (LOG_ERR, "error populating board!");
-        exit(-1);
-    }
+    //if(!populate_board(&board)) {
+    //    printf("error populating board!\n");
+    //    syslog (LOG_ERR, "error populating board!");
+    //    exit(-1);
+    //}
 
     /* Create end_checker thread */
     pthread_t end_checker_tid;
@@ -73,7 +77,7 @@ int main(int argc, char *argv[]) {
 
     /* create connection handler thread */
     pthread_t connection_handler_tid;
-    err = pthread_create(&connection_handler_tid, NULL, connection_handler, (void *) &board);
+    err = pthread_create(&connection_handler_tid, NULL, connection_handler, NULL);
     if (err != 0) {
         printf("\ncan't create thread :[%s]", strerror(err));
         syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
@@ -99,14 +103,8 @@ void setup_logging() {
     openlog ("game_server", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 }
 
+// see http://www.gnu.org/software/libc/manual/html_node/Server-Example.html
 void* connection_handler(void *arg) {
-    board_t *board = (board_t*) arg;
-
-    pthread_t game_tid[MAXPLAYERS];
-
-    _Bool started = false;
-
-    fd_set master;
     fd_set read_fds;
     int fdmax;
 
@@ -115,13 +113,10 @@ void* connection_handler(void *arg) {
     struct sockaddr_storage remoteaddr;
     socklen_t addrlen;
 
-    char buf[MAXBUFLEN];
-    int nbytes;
-
     char remoteIP[INET6_ADDRSTRLEN];
 
     int yes=1;
-    int i,j,rv;
+    int i,rv;
 
     struct addrinfo hints, *ai, *p;
 
@@ -183,19 +178,15 @@ void* connection_handler(void *arg) {
     fdmax = listener;
 
     // main loop
-    while(true) {
-        read_fds = master;
-        if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) {
-            perror("select");
-            exit(4);
-        }
+    read_fds = master;
+    if(select(fdmax+1, &read_fds, NULL, NULL, NULL) == -1) {
+        perror("select");
+        pthread_exit(0);
+    }
 
+    while(true) {
         // run through the existing connections looking for data to read
         for(i = 0; i <= fdmax; i++) {
-            data_t data;
-            data.fd = i;
-            data.id = i-3;
-
             if (FD_ISSET(i, &read_fds)) { // we got one!!
                 if (i == listener) {
                     // handle new connections
@@ -211,6 +202,7 @@ void* connection_handler(void *arg) {
                         if (newfd > fdmax) {    // keep track of the max
                             fdmax = newfd;
                         }
+
                         printf("server: new connection from %s on "
                             "socket %d\n",
                             inet_ntop(remoteaddr.ss_family,
@@ -222,64 +214,26 @@ void* connection_handler(void *arg) {
                                 get_in_addr((struct sockaddr*)&remoteaddr),
                                 remoteIP, INET6_ADDRSTRLEN),
                             newfd);
-                    }
-                } else {
-                    // handle data from a client
-                    if ((nbytes = recv(i, buf, sizeof buf, 0)) <= 0) {
-                        // got error or connection closed by client
-                        if (nbytes == 0) {
-                            // connection closed
-                            printf("server: socket %d hung up\n", i);
-                            syslog (LOG_INFO, "server: soket %d hung up", i);
-                        } else {
-                            perror("recv");
-                        }
-                        close(i); // bye!
-                        FD_CLR(i, &master); // remove from master set
-                    } else {
-                        // we got some data from a client
-                        if(debug) {
-                            printf("client %d sent %s\n", i, buf);
-                            syslog (LOG_INFO, "client %d sent %s", i, buf);
-                        }
 
-                        if(strcmp(buf, HELLO)) {
-                            // always send the size as a response to HELLO
-                            char *res = NULL;
-                            if(asprintf(&res, "%s %d\n", SIZE, board->n) == -1)
-                                exit(1);
+                        board.num_players++;
 
-                            if(send(i, res, sizeof(res), 0) == -1) {
-                                perror("send");
-                            }
+                        player_t *new_player;
+                        new_player = (player_t *) malloc(sizeof(player_t));
 
-                            // send start when we have n/2 connections,
-                            // otherwise send it only to the new guy
-                            // and start a new game thread
-                            if((fdmax-3) >= board->n/2 && !started) {
+                        new_player->id = i-3;
+                        new_player->fd = newfd;
 
-                                for(j = 0; j <= fdmax; j++) {
-                                    // send to everyone!
-                                    if (FD_ISSET(j, &master)) {
-                                        // except the listener
-                                        if (j != listener) {
-                                            if (send(j, START, sizeof(START), 0) == -1) {
-                                                perror("send");
-                                            }
-                                        }
-                                    }
-                                }
-                                started = true;
-                            } else if ((fdmax-3) >= board->n/2) {
-                                if(send(i, START, sizeof(START), 0) == -1) {
-                                    perror("send");
-                                }
+                        char name[255];
+                        memset(&name[0], 0, sizeof(name));
+                        sprintf(name, "player_%i", new_player->id);
+                        strcpy(new_player->name, name);
 
-                                int err = pthread_create(&(game_tid[data.id]), NULL, &game_thread, &data);
-                                if (err != 0)
-                                    printf("can't create thread :[%s]", strerror(err));
-                            }
-                        }
+                        //TODO: Track player on board
+
+                        int err = pthread_create(&(new_player->tid), NULL, &game_thread, new_player);
+                        if (err != 0)
+                            printf("can't create thread :[%s]", strerror(err));
+
                     }
                 } // END handle data from client
             } // END got new incoming connection
@@ -320,7 +274,7 @@ _Bool populate_board(board_t *board) {
     int i, j;
     for (i = 0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
-            strcpy(board->cells[i][j].owner, "");
+            strcpy(board->cells[i][j].player->name, ""); //TODO: player not initialized yet
         }
     }
     return true;
@@ -331,7 +285,7 @@ void print_board(board_t *board) {
 
     for (i=0; i<board->n; i++) {
         for (j=0; j<board->n; j++) {
-            printf("%s", board->cells[i][j].owner);
+            printf("%s", board->cells[i][j].player->name);
         }
         printf("\n");
     }
@@ -351,9 +305,38 @@ void* end_checker(void *arg) {
 }
 
 void *game_thread(void *arg) {
-    data_t *data = (data_t *) arg;
-    if(debug)
-        printf("In game thread. fd: %d, id: %d\n", data->fd, data->id);
+    player = (player_t *) arg;
 
+    int nbytes;
+    char buf[MAXBUFLEN];
+
+    while(true) {
+        int result = (nbytes = recv(player->fd, buf, sizeof buf, 0)) <= 0;
+
+        if( result && nbytes != 0 )
+             continue;
+
+        if(debug) {
+            printf("client %d sent %s\n", player->fd, buf);
+            syslog (LOG_INFO, "client %d sent %s", player->fd, buf);
+        }
+
+    }
+    // Parse incoming data and respond accordingly
+    if(strcmp(buf, HELLO)) {
+        // always send the size as a response to HELLO
+        char *res = NULL;
+        if(asprintf(&res, "%s %d\n", SIZE, board.n) == -1)
+            exit(1);
+
+        if(send(player->fd, res, sizeof(res), 0) == -1) {
+            perror("send");
+        }
+    } else {
+        char *res = "Unkown command";
+        if(send(player->fd, res, sizeof(res), 0) == -1) {
+            perror("send");
+        }
+    }
     return 0;
 }
