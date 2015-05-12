@@ -40,7 +40,8 @@ _Bool populate_board(board_t *board);
 void print_board(board_t *board);
 _Bool handle_incoming(int fd);
 _Bool *read_cell(board_t *board, int x, int y);
-_Bool wait_for_connections(board_t *board);
-void *game_thread(data_t *data);
-void end_checker(data_t *data);
 void *get_in_addr(struct sockaddr *sa);
+// Thread runs
+void* end_checker(void *arg);
+void* connection_handler(void *arg);
+void *game_thread(void *arg);

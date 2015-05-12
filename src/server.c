@@ -35,20 +35,13 @@ int main(int argc, char *argv[]) {
     syslog (LOG_INFO, "---- game server started ----");
 
     /* Setup pids */
-    pid_t child_pid, server_pid;
+    pid_t server_pid;
     server_pid = getpid();
 
     if(debug) {
         printf("server_pid: %d\n", server_pid);
         syslog (LOG_DEBUG, "server_pid: %d", server_pid);
     }
-
-    /* create shared memory object */
-    int shm_fd;
-    void *ptr;
-    char *shm_name = "/board";
-
-    shm_fd = shm_open(shm_name, O_RDWR | O_CREAT, PERM);
 
     board_t board;
     board.n = n;
@@ -68,43 +61,29 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    /* truncate shared memory to size of board */
-    size_t board_size = sizeof(&board);
-
-    if((ftruncate(shm_fd, board_size)) != 0) {
-        perror("ftruncate");
+    /* Create end_checker thread */
+    pthread_t end_checker_tid;
+    int err = pthread_create(&(end_checker_tid), NULL, &end_checker, NULL);
+    if (err != 0) {
+        printf("\ncan't create thread :[%s]", strerror(err));
+        syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
+        exit(-1);
     }
 
-    /* now map the shared memory segment in the address space of the process */
-    ptr = mmap(0, board_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (ptr == MAP_FAILED) {
-        printf("Map failed\n");
-        syslog (LOG_ERR, "Map failed");
-        exit(1);
-    }
-    syslog (LOG_DEBUG, "shm_mem size: %ld", board_size);
 
-    /* Create end_checker fork */
-    child_pid = fork();
-    if(child_pid == 0) {
-        syslog (LOG_DEBUG, "end_checker_pid: %d", getpid());
-        data_t data;
-        data.shm_fd = shm_fd;
-
-        end_checker(&data);
-    } else {
-
-        /* Still in parent - open connection handler */
-        child_pid = fork();
-        if(child_pid == 0) {
-            syslog (LOG_DEBUG, "connection_handler_pid: %d", getpid());
-            _Bool retcode = wait_for_connections(&board); // that doesnt work... please implement! (TODO)
-        }
+    /* create connection handler thread */
+    pthread_t connection_handler_tid;
+    err = pthread_create(&connection_handler_tid, NULL, connection_handler, (void *) &board);
+    if (err != 0) {
+        printf("\ncan't create thread :[%s]", strerror(err));
+        syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
+        exit(-1);
     }
 
-    /* wait for children to finish, close log and exit */
-    int status;
-    wait(&status);
+    /* wait for threads to finish, close log and exit */
+    pthread_join(end_checker_tid, NULL);
+    pthread_join(connection_handler_tid, NULL);
+
     syslog (LOG_INFO, "---- game server stopped ----");
     closelog();
 
@@ -120,7 +99,8 @@ void setup_logging() {
     openlog ("game_server", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 }
 
-_Bool wait_for_connections(board_t *board) {
+void* connection_handler(void *arg) {
+    board_t *board = (board_t*) arg;
 
     pthread_t game_tid[MAXPLAYERS];
 
@@ -179,12 +159,16 @@ _Bool wait_for_connections(board_t *board) {
     // if we get here we cloudnt bind to a socket
     if (p == NULL) {
         fprintf(stderr, "listener: failed to bind socket\n");
-        exit(2);
+        syslog (LOG_ERR, "listener: failed to bin socket!");
+        exit(-1);
     }
 
     freeaddrinfo(ai); // clean up, not used anymore
 
-    printf("listener: waiting to recvfrom...\n");
+    if(debug) {
+        printf("listener: waiting to recvfrom...\n");
+        syslog (LOG_DEBUG, "listener: waiting to recvfrom...");
+    }
 
     // listen
     if(listen(listener, BACKLOG) == -1) {
@@ -197,7 +181,6 @@ _Bool wait_for_connections(board_t *board) {
 
     // keep track of the biggest fd
     fdmax = listener;
-
 
     // main loop
     while(true) {
@@ -234,6 +217,11 @@ _Bool wait_for_connections(board_t *board) {
                                 get_in_addr((struct sockaddr*)&remoteaddr),
                                 remoteIP, INET6_ADDRSTRLEN),
                             newfd);
+                        syslog (LOG_INFO, "server: new connection from %s on socket %d",
+                            inet_ntop(remoteaddr.ss_family,
+                                get_in_addr((struct sockaddr*)&remoteaddr),
+                                remoteIP, INET6_ADDRSTRLEN),
+                            newfd);
                     }
                 } else {
                     // handle data from a client
@@ -242,6 +230,7 @@ _Bool wait_for_connections(board_t *board) {
                         if (nbytes == 0) {
                             // connection closed
                             printf("server: socket %d hung up\n", i);
+                            syslog (LOG_INFO, "server: soket %d hung up", i);
                         } else {
                             perror("recv");
                         }
@@ -249,8 +238,10 @@ _Bool wait_for_connections(board_t *board) {
                         FD_CLR(i, &master); // remove from master set
                     } else {
                         // we got some data from a client
-                        if(debug)
+                        if(debug) {
                             printf("client %d sent %s\n", i, buf);
+                            syslog (LOG_INFO, "client %d sent %s", i, buf);
+                        }
 
                         if(strcmp(buf, HELLO)) {
                             // always send the size as a response to HELLO
@@ -288,8 +279,6 @@ _Bool wait_for_connections(board_t *board) {
                                 if (err != 0)
                                     printf("can't create thread :[%s]", strerror(err));
                             }
-
-
                         }
                     }
                 } // END handle data from client
@@ -299,7 +288,6 @@ _Bool wait_for_connections(board_t *board) {
 
     return 0;
 }
-
 
 void alloc_cell_mem_ptrs(board_t *board) {
     board->cells = (cell_t**)malloc(board->n * sizeof(cell_t*));
@@ -349,50 +337,6 @@ void print_board(board_t *board) {
     }
 }
 
-_Bool handle_incoming(int fd) {
-    int numbytes;
-    char buf[MAXBUFLEN];
-    if ((numbytes = recv(fd, buf, MAXBUFLEN-1, 0)) == -1) {
-        perror("recv");
-        exit(1);
-    }
-
-    printf("%s\n", buf);
-    if (send(fd, COMMANDS[0], sizeof(COMMANDS[0]), 0) == -1)
-        perror("send");
-    return true;
-}
-
-
-_Bool *read_cell(board_t *board, int x, int y) {
-
-    if (pthread_rwlock_rdlock(&board->cells[x][y].lock) < 0) {
-        perror("rdlock");
-    } else {
-        strcpy(board->cells[x][y].owner, "foo");
-        if (pthread_rwlock_unlock(&board->cells[x][y].lock) != 0) {
-            perror("reader thread: pthred_rwlock_unlock error");
-            exit(__LINE__);
-        }
-    }
-    return false; // if we cant lock the cell it's already taken
-}
-
-void *game_thread(data_t *data) {
-    if(debug)
-        printf("In game thread. fd: %d, id: %d\n", data->fd, data->id);
-
-    return 0;
-}
-
-void end_checker(data_t *data) {
-    if(debug)
-        printf("in end_checker. shm_id: %d\n", data->shm_fd);
-    while(true) {
-
-    }
-}
-
 void *get_in_addr(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
@@ -401,3 +345,15 @@ void *get_in_addr(struct sockaddr *sa) {
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+
+void* end_checker(void *arg) {
+    return NULL;
+}
+
+void *game_thread(void *arg) {
+    data_t *data = (data_t *) arg;
+    if(debug)
+        printf("In game thread. fd: %d, id: %d\n", data->fd, data->id);
+
+    return 0;
+}
