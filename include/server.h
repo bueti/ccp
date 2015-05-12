@@ -17,8 +17,10 @@ typedef struct {
 
 typedef struct {
     int n;
-    cell_t **cells;
     int num_players;
+    pthread_t server_tid;
+    _Bool game_in_progress;
+    cell_t **cells;
 } board_t;
 
 typedef struct {
@@ -41,6 +43,7 @@ void print_board(board_t *board);
 _Bool handle_incoming(int fd);
 _Bool *read_cell(board_t *board, int x, int y);
 void *get_in_addr(struct sockaddr *sa);
+_Bool take_cell(player_t *player, int x, int y);
 // Thread runs
 void* end_checker(void *arg);
 void* connection_handler(void *arg);

@@ -8,7 +8,10 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/types.h>
 #include <syslog.h>
+#include <signal.h>
+#include <errno.h>
 
 #include "server.h"
 #include "server_optparse.h"
@@ -25,12 +28,32 @@ int n = 0;
 _Bool debug = false;
 board_t board;
 
-pthread_cond_t start_barrier;
+pthread_barrier_t start_barrier;
+
 fd_set master;
 __thread player_t* player;
 
+void signal_handler(int signo) {
+    if(debug) {
+        printf("got SIGUSR1 - game can start\n");
+        syslog (LOG_DEBUG, "got SIGUSR1 - game can start");
+    }
+
+    // TODO: Send to each player the start
+    // therefore we need the players list in the board
+    //if (send(player->fd, START, sizeof(START), 0) == -1) {
+    //    printf("error %i %i\n",player->fd,player->id);
+    //    perror("send START");
+    //    return NULL;
+    //}
+    board.game_in_progress = true;
+}
+
 /* main */
 int main(int argc, char *argv[]) {
+    /* Setting up signal handlers */
+    signal(SIGUSR1, signal_handler);
+
     /* Parse command line */
     if(!optparse(argc, argv))
         exit(1);
@@ -39,16 +62,25 @@ int main(int argc, char *argv[]) {
     setup_logging();
     syslog (LOG_INFO, "---- game server started ----");
 
-    /* Setup pids */
-    pid_t server_pid;
-    server_pid = getpid();
+    /* Setup tids */
+    board.server_tid = pthread_self();
 
     if(debug) {
-        printf("server_pid: %d\n", server_pid);
-        syslog (LOG_DEBUG, "server_pid: %d", server_pid);
+        printf("server_tid: %ld\n", (long)board.server_tid);
+        syslog (LOG_DEBUG, "server_tid: %ld", (long)board.server_tid);
     }
 
     board.n = n;
+    board.game_in_progress = false;
+
+    /* Setup starting barrier */
+    if(pthread_barrier_init(&start_barrier, NULL, board.n/2) != 0) {
+        if(debug) {
+            printf("pthread_barrier_init failed\n");
+        }
+        syslog (LOG_ERR, "pthread_barrier_init failed");
+        exit(-1);
+    }
 
     /* Allocate cell memory */
     alloc_cell_mem_ptrs(&board);
@@ -74,7 +106,6 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-
     /* create connection handler thread */
     pthread_t connection_handler_tid;
     err = pthread_create(&connection_handler_tid, NULL, connection_handler, NULL);
@@ -87,6 +118,8 @@ int main(int argc, char *argv[]) {
     /* wait for threads to finish, close log and exit */
     pthread_join(end_checker_tid, NULL);
     pthread_join(connection_handler_tid, NULL);
+
+    pthread_barrier_destroy(&start_barrier);
 
     syslog (LOG_INFO, "---- game server stopped ----");
     closelog();
@@ -228,8 +261,6 @@ void* connection_handler(void *arg) {
                         sprintf(name, "player_%i", new_player->id);
                         strcpy(new_player->name, name);
 
-                        //TODO: Track player on board
-
                         int err = pthread_create(&(new_player->tid), NULL, &game_thread, new_player);
                         if (err != 0)
                             printf("can't create thread :[%s]", strerror(err));
@@ -316,27 +347,79 @@ void *game_thread(void *arg) {
         if( result && nbytes != 0 )
              continue;
 
-        if(debug) {
-            printf("client %d sent %s\n", player->fd, buf);
-            syslog (LOG_INFO, "client %d sent %s", player->fd, buf);
-        }
+        if (result) {
+            if (nbytes == 0) {
+                // connection closed
+                printf("server: player %d with socket %d hung up\n", player->id, player->fd);
+            } else {
+                perror("recv");
+            }
 
-    }
-    // Parse incoming data and respond accordingly
-    if(strcmp(buf, HELLO)) {
-        // always send the size as a response to HELLO
-        char *res = NULL;
-        if(asprintf(&res, "%s %d\n", SIZE, board.n) == -1)
-            exit(1);
+            close(player->fd);
+            FD_CLR(player->fd, &master);
 
-        if(send(player->fd, res, sizeof(res), 0) == -1) {
-            perror("send");
-        }
+            board.num_players--;
     } else {
-        char *res = "Unkown command";
-        if(send(player->fd, res, sizeof(res), 0) == -1) {
-            perror("send");
+            if(debug) {
+                printf("client %d sent %s\n", player->fd, buf);
+                syslog (LOG_INFO, "client %d sent %s, number of players: %d, game in progress: %d", player->fd, buf, board.num_players, board.game_in_progress);
+            }
+            // Parse incoming data and respond accordingly
+            char *res = NULL;
+            if(sscanf(buf, HELLO) == 0) {
+                // always send the size as a response to HELLO
+                if(asprintf(&res, "%s %d\n", SIZE, board.n) == -1)
+                    exit(1);
+
+                if(send(player->fd, res, sizeof(res), 0) == -1) {
+                    perror("send");
+                }
+                if(board.game_in_progress) {
+                    if (send(player->fd, START, sizeof(START), 0) == -1) {
+                        printf("error %i %i\n",player->fd,player->id);
+                        perror("send START");
+                        return NULL;
+                    }
+                } else {
+                    int retcode = pthread_barrier_wait(&start_barrier);
+                    if(retcode == PTHREAD_BARRIER_SERIAL_THREAD) {
+                        // send signal here
+                        int status = pthread_kill( board.server_tid, SIGUSR1);
+                        if ( status <  0) {
+                            perror("pthread_kill failed");
+                        }
+                    } else if(res != 0) {
+                        printf("barrier open failed\n");
+                        syslog (LOG_DEBUG, "barrier open failed");
+                    }
+
+                    // Send Start
+                    if (send(player->fd, START, sizeof(START), 0) == -1) {
+                        printf("error %i %i\n",player->fd,player->id);
+                        perror("send START");
+                        return NULL;
+                    }
+                }
+            }
+
+            int x, y;
+            int n = sscanf(buf, TAKE, &x, &y);
+            if(n == 2) {
+                if(take_cell(player, x, y)) {
+                    printf("Cell at %d, %d successfully taken!\n", x, y);
+                    if (send(player->fd, TAKEN, sizeof(TAKEN), 0) == -1) {
+                        perror("send TAKEN");
+                    }
+                } else {
+                    // already taken
+                }
+            }
         }
+
     }
     return 0;
+}
+
+_Bool take_cell(player_t *player, int x, int y) {
+    return true;
 }
