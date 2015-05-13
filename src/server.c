@@ -42,12 +42,17 @@ void signal_handler(int signo) {
         }
         board->game_in_progress = true;
     }
+    if(signo == SIGINT) {
+        printf("Caught SIGINT, cleaning up and exiting...\n");
+        cleanup();
+    }
 }
 
 /* main */
 int main(int argc, char *argv[]) {
     /* Setting up signal handlers */
     signal(SIGUSR1, signal_handler);
+    signal(SIGINT, signal_handler);
 
     /* Parse command line */
     if(!optparse(argc, argv))
@@ -82,7 +87,6 @@ int main(int argc, char *argv[]) {
         syslog (LOG_DEBUG, "board size: %d", board->n);
     }
 
-
     /* Setup starting barrier */
     if(pthread_barrier_init(&start_barrier, NULL, board->n/2) != 0) {
         if(debug) {
@@ -105,12 +109,17 @@ int main(int argc, char *argv[]) {
     pthread_join(board->checker_tid, NULL);
     pthread_join(connection_handler_tid, NULL);
 
+    cleanup();
+
+    return 0;
+}
+
+void cleanup() {
     pthread_barrier_destroy(&start_barrier);
 
     syslog (LOG_INFO, "---- game server stopped ----");
     closelog();
-
-    return 0;
+    exit(0);
 }
 
 void setup_logging() {
@@ -295,19 +304,33 @@ void* end_checker(void *arg) {
     while(true) {
         // wait a random amount of time http://stackoverflow.com/questions/822323/how-to-generate-a-random-number-in-c
         srand(time(NULL));
-        sleep(rand());
+        int sleep_time = rand() % 10 + 1;
+        if(debug)
+            printf("sleeping for %d\n", sleep_time);
+        sleep(sleep_time);
 
         int counter = 0;
         // loop though board, check state, if all taken, end game
+        if(debug)
+            printf("looping through board\n");
         for(int i=0; i<board->n*board->n; i++) {
-            if(pthread_mutex_lock(&board->cells[i].cell_mutex)) {
+            if(pthread_mutex_trylock(&board->cells[i].cell_mutex) != 0) {
                 //taken
                 if(debug) {
-                    printf("%d taken by %s", i, board->cells[i].player->name);
+                    printf("%d taken by %s\n", i, board->cells[i].player->name);
                 }
                 counter++;
+            } else {
+                if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
+                    printf("error while unlocking\n");
+                } else {
+                    if(debug)
+                        printf("unlocked mutex - cell not taken\n");
+                }
             }
         }
+        if(debug)
+            printf("finished looping through board\n");
         if(counter >= board->n*board->n) {
             printf("game over...\n");
             exit(0);
@@ -435,10 +458,14 @@ void *game_thread(void *arg) {
 
 _Bool take_cell(player_t *player, int x, int y) {
     int cell_id = board->n * x + y;
+    if(cell_id > board->n*board->n) {
+        printf("out of range\n");
+        return false;
+    }
     if(pthread_mutex_trylock(&board->cells[cell_id-1].cell_mutex) == 0) {
         // successfully locked
-        board->cells[cell_id-1].player = player;
-        pthread_mutex_unlock(&board->cells[cell_id-1].cell_mutex);
+        board->cells[cell_id].player->name = player->name;
+        pthread_mutex_unlock(&board->cells[cell_id].cell_mutex);
         return true;
     } else {
         // already locked
