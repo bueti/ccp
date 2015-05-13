@@ -257,7 +257,7 @@ void* connection_handler() {
                         player_t *new_player;
                         new_player = (player_t *) malloc(sizeof(player_t));
 
-                        new_player->id = i-3;
+                        new_player->id = newfd-4;
                         new_player->fd = newfd;
 
                         char name[255];
