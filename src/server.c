@@ -439,10 +439,6 @@ void *game_thread(void *arg) {
                 char cmd[20];
                 int n = sscanf(data, "%s %d %d", cmd, &x, &y);
 
-                if(debug) {
-                    printf("take: n = %d\n", n);
-                }
-
                 if(n == 3) {
                     if(take_cell(player, x, y)) {
                         printf("Cell at %d, %d successfully taken!\n", x, y);
@@ -458,7 +454,26 @@ void *game_thread(void *arg) {
                     }
                 }
             }
+            // TODO: Implement properly
+            else if (strncmp(buf, STATUS, 4) == 0) {
+                if(debug) {
+                    printf("STATUS: client %d sent %s\n", player->fd, data);
+                    syslog (LOG_DEBUG, "client %d sent %s", player->fd, data);
+                }
+                int x, y;
+                char cmd[20];
+                int n = sscanf(data, "%s %d %d", cmd, &x, &y);
+                char *res = "NOT IMPLEMENTED";
+                if (send(player->fd, res, sizeof(res), 0) == -1) {
+                    perror("send STATUS");
+                }
+            } else {
+                char *res = "NACK";
+                if (send(player->fd, res, sizeof(res), 0) == -1) {
+                    perror("send UNKNOWN");
+                }
 
+            }
         }
 
     }
