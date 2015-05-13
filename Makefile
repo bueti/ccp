@@ -2,7 +2,7 @@ CC := gcc
 TARGETDIR := bin
 SRCDIR := src
 
-CFLAGS := -g -Wall -Wpedantic -Wextra -O2 -std=gnu99 -pthread -D_GNU_SOURCE
+CFLAGS := -g -Wall -Wpedantic -Wextra -O0 -std=gnu99 -pthread -D_GNU_SOURCE
 INC := -I ./include -L ./lib
 LIB := -L ./lib -lrt -lpthread
 
