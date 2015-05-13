@@ -27,32 +27,36 @@
 int n = 0;
 _Bool debug = false;
 board_t board;
-
-pthread_barrier_t start_barrier;
-
 fd_set master;
 __thread player_t* player;
 
+/* Barrier to synchronize START command */
+pthread_barrier_t start_barrier;
+
+/* Signal Handler used to start the game when enough players connected */
 void signal_handler(int signo) {
-    if(debug) {
-        printf("got SIGUSR1 - game can start\n");
-        syslog (LOG_DEBUG, "got SIGUSR1 - game can start");
+    if(signo == SIGUSR1) {
+        if(debug) {
+            printf("got SIGUSR1 - game can start\n");
+            syslog (LOG_DEBUG, "got SIGUSR1 - game can start");
+        }
+        board.game_in_progress = true;
     }
 
-    // TODO: Send to each player the start
-    // therefore we need the players list in the board
-    //if (send(player->fd, START, sizeof(START), 0) == -1) {
-    //    printf("error %i %i\n",player->fd,player->id);
-    //    perror("send START");
-    //    return NULL;
-    //}
-    board.game_in_progress = true;
+    if(signo == SIGUSR2) {
+        if(debug) {
+            printf("got SIGUSR2 - notify game checker\n");
+            syslog (LOG_DEBUG, "got SIGUSR2 - notify game checker");
+        }
+        // TODO: Notify game checker
+    }
 }
 
 /* main */
 int main(int argc, char *argv[]) {
     /* Setting up signal handlers */
     signal(SIGUSR1, signal_handler);
+    signal(SIGUSR2, signal_handler);
 
     /* Parse command line */
     if(!optparse(argc, argv))
@@ -62,16 +66,15 @@ int main(int argc, char *argv[]) {
     setup_logging();
     syslog (LOG_INFO, "---- game server started ----");
 
-    /* Setup tids */
+    /* Setup board basics */
     board.server_tid = pthread_self();
+    board.n = n;
+    board.game_in_progress = false;
 
     if(debug) {
         printf("server_tid: %ld\n", (long)board.server_tid);
         syslog (LOG_DEBUG, "server_tid: %ld", (long)board.server_tid);
     }
-
-    board.n = n;
-    board.game_in_progress = false;
 
     /* Setup starting barrier */
     if(pthread_barrier_init(&start_barrier, NULL, board.n/2) != 0) {
@@ -97,18 +100,9 @@ int main(int argc, char *argv[]) {
     //    exit(-1);
     //}
 
-    /* Create end_checker thread */
-    pthread_t end_checker_tid;
-    int err = pthread_create(&(end_checker_tid), NULL, &end_checker, NULL);
-    if (err != 0) {
-        printf("\ncan't create thread :[%s]", strerror(err));
-        syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
-        exit(-1);
-    }
-
     /* create connection handler thread */
     pthread_t connection_handler_tid;
-    err = pthread_create(&connection_handler_tid, NULL, connection_handler, NULL);
+    int err = pthread_create(&connection_handler_tid, NULL, connection_handler, NULL);
     if (err != 0) {
         printf("\ncan't create thread :[%s]", strerror(err));
         syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
@@ -116,7 +110,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* wait for threads to finish, close log and exit */
-    pthread_join(end_checker_tid, NULL);
+    pthread_join(board.checker_tid, NULL);
     pthread_join(connection_handler_tid, NULL);
 
     pthread_barrier_destroy(&start_barrier);
@@ -262,8 +256,12 @@ void* connection_handler(void *arg) {
                         strcpy(new_player->name, name);
 
                         int err = pthread_create(&(new_player->tid), NULL, &game_thread, new_player);
-                        if (err != 0)
+                        if (err != 0) {
                             printf("can't create thread :[%s]", strerror(err));
+                            if(send(player->fd, NACK, sizeof(NACK), 0) == -1) {
+                                perror("ERROR sending NACK");
+                            }
+                        }
 
                     }
                 } // END handle data from client
@@ -332,10 +330,14 @@ void *get_in_addr(struct sockaddr *sa) {
 
 
 void* end_checker(void *arg) {
-    return NULL;
+    if(debug) {
+        printf("Starting end_checker\n");
+    }
+    syslog(LOG_INFO, "starting end_checker thread: %ld", (long)board.checker_tid);
 }
 
 void *game_thread(void *arg) {
+
     player = (player_t *) arg;
 
     int nbytes;
@@ -388,11 +390,22 @@ void *game_thread(void *arg) {
                 } else {
                     int retcode = pthread_barrier_wait(&start_barrier);
                     if(retcode == PTHREAD_BARRIER_SERIAL_THREAD) {
-                        // send signal here
+                        // Notify all players
                         int status = pthread_kill( board.server_tid, SIGUSR1);
                         if ( status <  0) {
-                            perror("pthread_kill failed");
+                            perror("Sending Start Signal to server_tid failed");
                         }
+
+                        /* Create end_checker thread */
+                        pthread_t end_checker_tid;
+                        int err = pthread_create(&(end_checker_tid), NULL, &end_checker, NULL);
+                        if (err != 0) {
+                            printf("\ncan't create thread :[%s]", strerror(err));
+                            syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
+                            exit(-1);
+                        }
+                        board.checker_tid = end_checker_tid;
+
                     } else if(res != 0) {
                         printf("barrier open failed\n");
                         syslog (LOG_DEBUG, "barrier open failed");
@@ -426,6 +439,10 @@ void *game_thread(void *arg) {
                         }
                     } else {
                         // already taken
+                        printf("Cell at %d, %d already taken!\n", x, y);
+                        if (send(player->fd, INUSE, sizeof(TAKEN), 0) == -1) {
+                            perror("send INUSE");
+                        }
                     }
                 }
             }
@@ -437,7 +454,10 @@ void *game_thread(void *arg) {
 }
 
 _Bool take_cell(player_t *player, int x, int y) {
-    // TODO....
+    // 1. Lock Cell Mutex
+    // 2. Write my name into cell
+    // 3. Unlock
+    // 4. Send TAKEN
     return true;
 }
 
