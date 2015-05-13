@@ -10,23 +10,11 @@
 #include <netdb.h>
 
 #include "client_optparse.h"
+#include "client.h"
 #include "commands.h"
 #include "shared.h"
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once
-
-/*
-* My Structs
-*/
-
-typedef struct {
-    char * name;
-} player_t;
-
-typedef struct {
-    int fd;
-    int size;
-} client_t;
 
 /*
 * Global Vars
@@ -35,13 +23,6 @@ char *name;
 char *hostname;
 char *port;
 int size;
-
-/*
-* My functions
-*/
-void *get_in_addr(struct sockaddr *sa);
-int start_client();
-void start_simple(int sockfd);
 
 int main(int argc, char *argv[]) {
     // Parse command line
