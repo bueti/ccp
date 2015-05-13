@@ -26,7 +26,7 @@
 /* Global Vars */
 int n = 0;
 _Bool debug = false;
-board_t board;
+board_t *board;
 fd_set master;
 __thread player_t* player;
 
@@ -40,15 +40,7 @@ void signal_handler(int signo) {
             printf("got SIGUSR1 - game can start\n");
             syslog (LOG_DEBUG, "got SIGUSR1 - game can start");
         }
-        board.game_in_progress = true;
-    }
-
-    if(signo == SIGUSR2) {
-        if(debug) {
-            printf("got SIGUSR2 - notify game checker\n");
-            syslog (LOG_DEBUG, "got SIGUSR2 - notify game checker");
-        }
-        // TODO: Notify game checker
+        board->game_in_progress = true;
     }
 }
 
@@ -56,7 +48,6 @@ void signal_handler(int signo) {
 int main(int argc, char *argv[]) {
     /* Setting up signal handlers */
     signal(SIGUSR1, signal_handler);
-    signal(SIGUSR2, signal_handler);
 
     /* Parse command line */
     if(!optparse(argc, argv))
@@ -66,39 +57,40 @@ int main(int argc, char *argv[]) {
     setup_logging();
     syslog (LOG_INFO, "---- game server started ----");
 
-    /* Setup board basics */
-    board.server_tid = pthread_self();
-    board.n = n;
-    board.game_in_progress = false;
+    /* Allocate cell memory */
+    board = malloc(sizeof(board_t));
+    board->cells = (cell_t *) malloc(sizeof(cell_t)*n*n);
+     board->cells->player = (player_t*) malloc(sizeof(player_t));
 
-    if(debug) {
-        printf("server_tid: %ld\n", (long)board.server_tid);
-        syslog (LOG_DEBUG, "server_tid: %ld", (long)board.server_tid);
+    player_t* dummy  = (player_t *) malloc(sizeof(player_t));
+    dummy->name  = malloc(sizeof(char)*256);
+    dummy->name = "free";
+    for(int i = 0; i < n*n; i++){
+        board->cells[i].player = dummy;
+        pthread_mutex_init(&board->cells[i].cell_mutex, NULL);
     }
 
+    /* Setup board basics */
+    board->server_tid = pthread_self();
+    board->n = n;
+    board->game_in_progress = false;
+
+    if(debug) {
+        printf("server_tid: %ld\n", (long)board->server_tid);
+        syslog (LOG_DEBUG, "server_tid: %ld", (long)board->server_tid);
+        printf("board size: %d\n", board->n);
+        syslog (LOG_DEBUG, "board size: %d", board->n);
+    }
+
+
     /* Setup starting barrier */
-    if(pthread_barrier_init(&start_barrier, NULL, board.n/2) != 0) {
+    if(pthread_barrier_init(&start_barrier, NULL, board->n/2) != 0) {
         if(debug) {
             printf("pthread_barrier_init failed\n");
         }
         syslog (LOG_ERR, "pthread_barrier_init failed");
         exit(-1);
     }
-
-    /* Allocate cell memory */
-    alloc_cell_mem_ptrs(&board);
-
-    if(!init_board(&board)) {
-        printf("error initializing board!\n");
-        syslog (LOG_ERR, "error initializing board!");
-        exit(-1);
-    }
-
-    //if(!populate_board(&board)) {
-    //    printf("error populating board!\n");
-    //    syslog (LOG_ERR, "error populating board!");
-    //    exit(-1);
-    //}
 
     /* create connection handler thread */
     pthread_t connection_handler_tid;
@@ -110,7 +102,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* wait for threads to finish, close log and exit */
-    pthread_join(board.checker_tid, NULL);
+    pthread_join(board->checker_tid, NULL);
     pthread_join(connection_handler_tid, NULL);
 
     pthread_barrier_destroy(&start_barrier);
@@ -242,7 +234,7 @@ void* connection_handler(void *arg) {
                                 remoteIP, INET6_ADDRSTRLEN),
                             newfd);
 
-                        board.num_players++;
+                        board->num_players++;
 
                         player_t *new_player;
                         new_player = (player_t *) malloc(sizeof(player_t));
@@ -272,51 +264,16 @@ void* connection_handler(void *arg) {
     return 0;
 }
 
-void alloc_cell_mem_ptrs(board_t *board) {
-    board->cells = (cell_t**)malloc(board->n * sizeof(cell_t*));
-
-    int i;
-    for (i = 0; i < board->n; ++i) {
-        board->cells[i] = (cell_t*)malloc(board->n * sizeof(cell_t*));
-    }
-
-}
-
-_Bool init_board(board_t *board) {
-    // allocate memory for the data of all cells on the board
-    board->cells = (cell_t **) malloc(sizeof (cell_t *) * board->n);
-    int i;
-    for (i = 0; i < board->n ; ++i) {
-       if(!(board->cells[i] = (cell_t *) malloc(sizeof(cell_t *) * board->n)))
-            return false;
-    }
-
-    if(debug) {
-        printf("board size: %d\n", board->n);
-        syslog (LOG_DEBUG, "board size: %d", board->n);
-    }
+_Bool init_board() {
 
     return true;
 }
 
-_Bool populate_board(board_t *board) {
-    int i, j;
-    for (i = 0; i<board->n; i++) {
-        for (j=0; j<board->n; j++) {
-            strcpy(board->cells[i][j].player->name, ""); //TODO: player not initialized yet
-        }
-    }
-    return true;
-}
-
-void print_board(board_t *board) {
-    int i, j;
+void print_board() {
+    int i;
 
     for (i=0; i<board->n; i++) {
-        for (j=0; j<board->n; j++) {
-            printf("%s", board->cells[i][j].player->name);
-        }
-        printf("\n");
+        printf("%s", board->cells[i].player->name);
     }
 }
 
@@ -333,7 +290,30 @@ void* end_checker(void *arg) {
     if(debug) {
         printf("Starting end_checker\n");
     }
-    syslog(LOG_INFO, "starting end_checker thread: %ld", (long)board.checker_tid);
+    syslog(LOG_INFO, "starting end_checker thread: %ld", (long)board->checker_tid);
+
+    while(true) {
+        // wait a random amount of time http://stackoverflow.com/questions/822323/how-to-generate-a-random-number-in-c
+        srand(time(NULL));
+        sleep(rand());
+
+        int counter = 0;
+        // loop though board, check state, if all taken, end game
+        for(int i=0; i<board->n*board->n; i++) {
+            if(pthread_mutex_lock(&board->cells[i].cell_mutex)) {
+                //taken
+                if(debug) {
+                    printf("%d taken by %s", i, board->cells[i].player->name);
+                }
+                counter++;
+            }
+        }
+        if(counter >= board->n*board->n) {
+            printf("game over...\n");
+            exit(0);
+        }
+    }
+    return NULL;
 }
 
 void *game_thread(void *arg) {
@@ -360,7 +340,7 @@ void *game_thread(void *arg) {
             close(player->fd);
             FD_CLR(player->fd, &master);
 
-            board.num_players--;
+            board->num_players--;
     } else {
             // Parse incoming data and respond accordingly
             char *res = NULL;
@@ -370,18 +350,18 @@ void *game_thread(void *arg) {
 
             if(debug) {
                 printf("client %d sent %s\n", player->fd, data);
-                syslog (LOG_INFO, "client %d sent %s, number of players: %d, game in progress: %d", player->fd, data, board.num_players, board.game_in_progress);
+                syslog (LOG_INFO, "client %d sent %s, number of players: %d, game in progress: %d", player->fd, data, board->num_players, board->game_in_progress);
             }
 
             if(strcmp(data, HELLO) == 0) {
                 // always send the size as a response to HELLO
-                if(asprintf(&res, "%s %d\n", SIZE, board.n) == -1)
+                if(asprintf(&res, "%s %d\n", SIZE, board->n) == -1)
                     exit(1);
 
                 if(send(player->fd, res, sizeof(res), 0) == -1) {
                     perror("send");
                 }
-                if(board.game_in_progress) {
+                if(board->game_in_progress) {
                     if (send(player->fd, START, sizeof(START), 0) == -1) {
                         printf("error %i %i\n",player->fd,player->id);
                         perror("send START");
@@ -391,7 +371,7 @@ void *game_thread(void *arg) {
                     int retcode = pthread_barrier_wait(&start_barrier);
                     if(retcode == PTHREAD_BARRIER_SERIAL_THREAD) {
                         // Notify all players
-                        int status = pthread_kill( board.server_tid, SIGUSR1);
+                        int status = pthread_kill( board->server_tid, SIGUSR1);
                         if ( status <  0) {
                             perror("Sending Start Signal to server_tid failed");
                         }
@@ -404,7 +384,7 @@ void *game_thread(void *arg) {
                             syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
                             exit(-1);
                         }
-                        board.checker_tid = end_checker_tid;
+                        board->checker_tid = end_checker_tid;
 
                     } else if(res != 0) {
                         printf("barrier open failed\n");
@@ -454,11 +434,16 @@ void *game_thread(void *arg) {
 }
 
 _Bool take_cell(player_t *player, int x, int y) {
-    // 1. Lock Cell Mutex
-    // 2. Write my name into cell
-    // 3. Unlock
-    // 4. Send TAKEN
-    return true;
+    int cell_id = board->n * x + y;
+    if(pthread_mutex_trylock(&board->cells[cell_id-1].cell_mutex) == 0) {
+        // successfully locked
+        board->cells[cell_id-1].player = player;
+        pthread_mutex_unlock(&board->cells[cell_id-1].cell_mutex);
+        return true;
+    } else {
+        // already locked
+        return false;
+    }
 }
 
 // from http://stackoverflow.com/questions/1515195/how-to-remove-n-or-t-from-a-given-string-in-c
