@@ -32,6 +32,6 @@ void print_board();
 _Bool take_cell(player_t *player, int x, int y);
 char *strip_copy(const char *s);
 // Thread runs
-void *end_checker(void *arg);
-void *connection_handler(void *arg);
+void *end_checker();
+void *connection_handler();
 void *game_thread(void *arg);

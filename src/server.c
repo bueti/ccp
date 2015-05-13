@@ -37,13 +37,14 @@ pthread_barrier_t start_barrier;
 void signal_handler(int signo) {
     if(signo == SIGUSR1) {
         if(debug) {
-            printf("got SIGUSR1 - game can start\n");
-            syslog (LOG_DEBUG, "got SIGUSR1 - game can start");
+            printf("Caught SIGUSR1 - game can start\n");
+            syslog (LOG_DEBUG, "Caught SIGUSR1 - game can start");
         }
         board->game_in_progress = true;
     }
     if(signo == SIGINT) {
         printf("Caught SIGINT, cleaning up and exiting...\n");
+        syslog (LOG_INFO, "Caught SIGINT - cleaning up and exiting...");
         cleanup();
     }
 }
@@ -65,7 +66,7 @@ int main(int argc, char *argv[]) {
     /* Allocate cell memory */
     board = malloc(sizeof(board_t));
     board->cells = (cell_t *) malloc(sizeof(cell_t)*n*n);
-     board->cells->player = (player_t*) malloc(sizeof(player_t));
+    board->cells->player = (player_t*) malloc(sizeof(player_t));
 
     player_t* dummy  = (player_t *) malloc(sizeof(player_t));
     dummy->name  = malloc(sizeof(char)*256);
@@ -79,6 +80,7 @@ int main(int argc, char *argv[]) {
     board->server_tid = pthread_self();
     board->n = n;
     board->game_in_progress = false;
+    board->num_players = 0;
 
     if(debug) {
         printf("server_tid: %ld\n", (long)board->server_tid);
@@ -117,6 +119,13 @@ int main(int argc, char *argv[]) {
 void cleanup() {
     pthread_barrier_destroy(&start_barrier);
 
+    for(int i = 0; i < n*n; i++){
+        pthread_mutex_init(&board->cells[i].cell_mutex, NULL);
+    }
+
+    free(board->cells);
+    free(board);
+
     syslog (LOG_INFO, "---- game server stopped ----");
     closelog();
     exit(0);
@@ -132,7 +141,7 @@ void setup_logging() {
 }
 
 // see http://www.gnu.org/software/libc/manual/html_node/Server-Example.html
-void* connection_handler(void *arg) {
+void* connection_handler() {
     fd_set read_fds;
     int fdmax;
 
@@ -295,7 +304,7 @@ void *get_in_addr(struct sockaddr *sa) {
 }
 
 
-void* end_checker(void *arg) {
+void* end_checker() {
     if(debug) {
         printf("Starting end_checker\n");
     }
