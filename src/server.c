@@ -284,16 +284,11 @@ void* connection_handler() {
     return 0;
 }
 
-_Bool init_board() {
-
-    return true;
-}
-
 void print_board() {
     int i;
 
-    for (i=0; i<board->n; i++) {
-        printf("%s", board->cells[i].player->name);
+    for (i=0; i<board->n*board->n; i++) {
+        printf("%s ", board->cells[i].player->name);
     }
 }
 
@@ -304,7 +299,6 @@ void *get_in_addr(struct sockaddr *sa) {
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-
 
 void* end_checker() {
     if(debug) {
@@ -468,7 +462,7 @@ void *game_thread(void *arg) {
                     }
                 }
             }
-            // TODO: Implement properly
+            // TODO: Implement STATUS properly
             else if (strncmp(buf, STATUS, 4) == 0) {
                 if(debug) {
                     printf("STATUS: client %d sent %s\n", player->fd, data);
