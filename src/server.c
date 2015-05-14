@@ -344,6 +344,7 @@ void* end_checker() {
             printf("finished looping through board\n");
         if(counter >= board->n*board->n) {
             printf("game over...\n");
+            // TODO: Send END to all clients
             exit(0);
         }
     }
@@ -488,7 +489,7 @@ _Bool take_cell(player_t *player, int x, int y) {
         printf("out of range\n");
         return false;
     }
-    if(pthread_mutex_trylock(&board->cells[cell_id-1].cell_mutex) == 0) {
+    if(pthread_mutex_trylock(&board->cells[cell_id].cell_mutex) == 0) {
         // successfully locked
         board->cells[cell_id].player->name = player->name;
         pthread_mutex_unlock(&board->cells[cell_id].cell_mutex);
