@@ -328,23 +328,31 @@ void* end_checker() {
         }
 
         for(int i=0; i<board->n*board->n; i++) {
-            if(pthread_mutex_trylock(&board->cells[i].cell_mutex) != 0) {
+            fprintf(stderr, "trying to lock cell %d\n", i);
+            if(pthread_mutex_lock(&board->cells[i].cell_mutex) == 0) {
                 //taken
-                if(debug) {
-                    fprintf(stderr, "%d taken by %s\n", i, board->cells[i].player->name);
-                    syslog(LOG_DEBUG, "%d taken by %s", i, board->cells[i].player->name);
+                if(strcmp("free", board->cells[i].player->name) != 0) {
+                    if(debug) {
+                        fprintf(stderr, "%d taken by %s\n", i, board->cells[i].player->name);
+                        syslog(LOG_DEBUG, "%d taken by %s", i, board->cells[i].player->name);
+                    }
+                    counter++;
+                } else {
+                    if(debug) {
+                        fprintf(stderr, "cell %d not taken\n", i);
+                        syslog(LOG_DEBUG, "cell %d not  taken", i);
+                    }
                 }
-                counter++;
-            } else {
                 if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
                     fprintf(stderr, "error while unlocking\n");
                     syslog(LOG_ERR, "error while unlocking");
-                } else {
-                    if(debug) {
-                        fprintf(stderr, "mutex not locked -> cell %d not taken\n", i);
-                        syslog(LOG_DEBUG, "mutex not locked -> cell %d not  taken", i);
-                    }
                 }
+            } else {
+                if(debug) {
+                    fprintf(stderr, "couldn't lock cell at %d\n", i);
+                    syslog(LOG_ERR, "couldn't lock cell at %d", i);
+                }
+
             }
         }
         if(debug) {
@@ -449,9 +457,11 @@ void *game_thread(void *arg) {
             } else if (strncmp(buf, TAKE, 4) == 0) {
                 int x, y;
                 char cmd[20];
-                int n = sscanf(data, "%s %d %d", cmd, &x, &y);
+                char name[20];
+                int n = sscanf(data, "%s %d %d %s", cmd, &x, &y, name);
+                player->name = name;
 
-                if(n == 3) {
+                if(n == 4) {
                     if(take_cell(player, x, y)) {
                         fprintf(stderr, "Cell at %d, %d successfully taken!\n", x, y);
                         if (send(player->fd, TAKEN, sizeof(TAKEN), 0) == -1) {

@@ -15,6 +15,6 @@ typedef struct {
 * functions
 */
 void *get_in_addr(struct sockaddr *sa);
-int start_client();
-void start_simple(int sockfd);
+int start_client(player_t *player);
+void start_simple(int sockfd, player_t *player);
 

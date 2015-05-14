@@ -36,12 +36,12 @@ int main(int argc, char *argv[]) {
 
     printf("Player Name: %s\n", player->name);
 
-    int retcode = start_client();
+    int retcode = start_client(player);
 
     return retcode;
 }
 
-int start_client() {
+int start_client(player_t *player) {
     // from http://beej.us/guide/bgnet/output/html/multipage/clientserver.html
     int sockfd, numbytes;
     char buf[MAXDATASIZE];
@@ -125,7 +125,7 @@ int start_client() {
 
         printf("Server answer: %s\n", buf);
         if(strncmp(buf, START, 4) == 0) {
-            start_simple(sockfd);
+            start_simple(sockfd, player);
         }
 
     }
@@ -139,7 +139,7 @@ int start_client() {
  * simplest implementation of a client
  * will go through 1 to n and try to fetch the cell
  */
-void start_simple(int fd) {
+void start_simple(int fd, player_t *player) {
     char *msg = NULL;
     char buf[MAXDATASIZE];
     int numbytes;
@@ -150,7 +150,7 @@ void start_simple(int fd) {
     while(isRunning || counter<maxTries) {
         for (int i=0; i<size; i++) {
             for (int j=0; j<size; j++) {
-                asprintf(&msg, "%s %d %d\n", TAKE, i, j);
+                asprintf(&msg, "%s %d %d %s\n", TAKE, i, j, player->name);
                 printf("Sending %s to server\n", msg);
 
                 if (send(fd, msg, strlen(msg), 0) == -1) {
