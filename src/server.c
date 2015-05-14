@@ -313,8 +313,11 @@ void* end_checker() {
         if(sleep_time == 0)
             sleep_time++;
 
-        if(debug)
+        if(debug) {
             fprintf(stderr, "sleeping for %d\n", sleep_time);
+            syslog(LOG_DEBUG, "sleeping for %d", sleep_time);
+        }
+
         sleep(sleep_time);
 
         int counter = 0;
@@ -338,8 +341,8 @@ void* end_checker() {
                     syslog(LOG_ERR, "error while unlocking");
                 } else {
                     if(debug) {
-                        fprintf(stderr, "mutex not locked -> cell not taken\n");
-                        syslog(LOG_DEBUG, "mutex not locked -> cell not  taken");
+                        fprintf(stderr, "mutex not locked -> cell %d not taken\n", i);
+                        syslog(LOG_DEBUG, "mutex not locked -> cell %d not  taken", i);
                     }
                 }
             }
@@ -351,6 +354,7 @@ void* end_checker() {
 
         if(counter >= board->n*board->n) {
             fprintf(stderr, "game over...\n");
+            syslog(LOG_INFO, "game over, sending END");
             // TODO: Send END to all clients
             exit(0);
         }
