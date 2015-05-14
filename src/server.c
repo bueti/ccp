@@ -340,20 +340,31 @@ void* end_checker() {
 
         for(int i=0; i<board->n*board->n; i++) {
             fprintf(stderr, "trying to lock cell %d\n", i);
+            syslog(LOG_INFO, "check loop started");
             if(pthread_mutex_lock(&board->cells[i].cell_mutex) == 0) {
                 //taken
                 name_curr = board->cells[i].player->name;
+                if(i==0)
+                    name_last = name_curr;
+
+                if(debug) {
+                    syslog(LOG_DEBUG, "last: %s - curr: %s - cell: %d", name_last, name_curr, i);
+                }
                 if(strcmp(name_curr, name_last) != 0) {
                     got_winner = false;
+                    if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
+                        fprintf(stderr, "error while unlocking\n");
+                        syslog(LOG_ERR, "error while unlocking");
+                    }
                     break;
                 }
 
                 name_last = name_curr;
-
                 if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
                     fprintf(stderr, "error while unlocking\n");
                     syslog(LOG_ERR, "error while unlocking");
                 }
+
             } else {
                 if(debug) {
                     fprintf(stderr, "couldn't lock cell at %d\n", i);
@@ -371,7 +382,11 @@ void* end_checker() {
             // we have a winner, celebrate
             fprintf(stderr, "game over - winner is %s - sending END\n", name_curr);
             syslog(LOG_INFO, "game over - winner is %s - sending END", name_curr);
-            // TODO: Send END to all clients
+            for(int i = 0; i<board->num_players; i++) {
+                if (send(players[i].fd, END, sizeof(END), 0) == -1) {
+                    perror("send END");
+                }
+            }
             exit(0);
         }
 
@@ -485,17 +500,16 @@ void *game_thread(void *arg) {
                     }
                 }
             }
-            // TODO: Implement STATUS properly
             else if (strncmp(buf, STATUS, 4) == 0) {
                 if(debug) {
                     fprintf(stderr, "STATUS: client %d sent %s\n", player->fd, data);
                     syslog (LOG_DEBUG, "client %d sent %s", player->fd, data);
                 }
                 int x, y;
-                char cmd[20];
+                char cmd[7];
                 sscanf(data, "%s %d %d", cmd, &x, &y);
-                char *res = "NOT IMPLEMENTED";
-                if (send(player->fd, res, sizeof(res), 0) == -1) {
+                char *name = board->cells[board->n*x+y].player->name;
+                if (send(player->fd, name, sizeof(name), 0) == -1) {
                     perror("send STATUS");
                 }
             } else {
