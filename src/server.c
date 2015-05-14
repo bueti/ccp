@@ -388,6 +388,7 @@ void* end_checker() {
                     perror("send END");
                 }
             }
+            cleanup();
             exit(0);
         }
 
