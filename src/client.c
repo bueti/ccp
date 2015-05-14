@@ -36,12 +36,12 @@ int main(int argc, char *argv[]) {
 
     printf("Player Name: %s\n", player->name);
 
-    int retcode = start_client(player);
+    int retcode = start_client();
 
     return retcode;
 }
 
-int start_client(player_t *player) {
+int start_client() {
     // from http://beej.us/guide/bgnet/output/html/multipage/clientserver.html
     int sockfd, numbytes;
     char buf[MAXDATASIZE];

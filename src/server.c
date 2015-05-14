@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     /* Setup board basics */
     board->server_tid = pthread_self();
-    board->checker_tid = NULL;
+    board->checker_tid = pthread_self();
     board->n = n;
     board->game_in_progress = false;
     board->num_players = 0;
@@ -476,7 +476,7 @@ void *game_thread(void *arg) {
                 }
                 int x, y;
                 char cmd[20];
-                int n = sscanf(data, "%s %d %d", cmd, &x, &y);
+                sscanf(data, "%s %d %d", cmd, &x, &y);
                 char *res = "NOT IMPLEMENTED";
                 if (send(player->fd, res, sizeof(res), 0) == -1) {
                     perror("send STATUS");
