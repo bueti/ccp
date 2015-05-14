@@ -143,25 +143,49 @@ void start_simple(int fd) {
     char *msg = NULL;
     char buf[MAXDATASIZE];
     int numbytes;
+    _Bool isRunning = true;
+    int maxTries = 10;
+    int counter = 0;
 
-    for (int i=0; i<size; i++) {
-        for (int j=0; j<size; j++) {
-            asprintf(&msg, "%s %d %d\n", TAKE, i, j);
+    while(isRunning || counter<maxTries) {
+        for (int i=0; i<size; i++) {
+            for (int j=0; j<size; j++) {
+                asprintf(&msg, "%s %d %d\n", TAKE, i, j);
+                printf("Sending %s to server\n", msg);
 
-            if (send(fd, msg, strlen(msg), 0) == -1) {
-                perror("client: sendto");
-                close(fd);
-                exit(-1);
+                if (send(fd, msg, strlen(msg), 0) == -1) {
+                    perror("client: sendto");
+                    close(fd);
+                    exit(-1);
+                }
+
+                numbytes = recv(fd, buf, MAXDATASIZE-1, 0);
+                if (numbytes <= 0) {
+                    perror("recv");
+                    exit(-1);
+                }
+
+                if(strncmp(buf, END, 3) == 0) {
+                    printf("Game is over\n");
+                    exit(0);
+                }
+
+                if(!strncmp(buf, TAKEN, 5) == 0) {
+                    // retry
+                    if (send(fd, msg, strlen(msg), 0) == -1) {
+                        perror("client: sendto");
+                        close(fd);
+                        exit(-1);
+                    }
+                }
+                printf("2nd try - server answer: %s\n", buf);
+                if(strncmp(buf, END, 3) == 0) {
+                    printf("Game is over\n");
+                    isRunning = false;
+                }
             }
-
-            numbytes = recv(fd, msg, MAXDATASIZE-1, 0);
-            if (numbytes <= 0) {
-                perror("recv");
-                exit(-1);
-            }
-
-            printf("Server answer: %s\n", buf);
         }
+        counter++;
     }
 }
 
