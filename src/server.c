@@ -437,12 +437,9 @@ void *game_thread(void *arg) {
                         perror("send START");
                         return NULL;
                     }
+                    free(res);
                 }
             } else if (strncmp(buf, TAKE, 4) == 0) {
-                if(debug) {
-                    printf("TAKE: client %d sent %s\n", player->fd, data);
-                    syslog (LOG_DEBUG, "client %d sent %s", player->fd, data);
-                }
                 int x, y;
                 char cmd[20];
                 int n = sscanf(data, "%s %d %d", cmd, &x, &y);
@@ -482,6 +479,7 @@ void *game_thread(void *arg) {
                 }
 
             }
+            free(data);
         }
 
     }
