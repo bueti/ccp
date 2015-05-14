@@ -66,11 +66,13 @@ int main(int argc, char *argv[]) {
 
     /* Allocate cell memory */
     board = malloc(sizeof(board_t));
-    board->cells = (cell_t *) malloc(sizeof(cell_t)*n*n);
-    board->cells->player = (player_t*) malloc(sizeof(player_t));
+    board->cells = malloc(sizeof(cell_t*)*n*n);
 
-    player_t* dummy  = (player_t *) malloc(sizeof(player_t));
-    dummy->name  = malloc(sizeof(char)*256);
+    for(int i=0; i<n*n; i++)
+        board->cells[i].player = malloc(sizeof(player_t*));
+
+    player_t* dummy = malloc(sizeof(player_t)*MAXPLAYERS);
+    dummy->name = malloc(sizeof(char)*256);
     dummy->name = "free";
     for(int i = 0; i < n*n; i++){
         board->cells[i].player = dummy;
@@ -464,7 +466,7 @@ void *game_thread(void *arg) {
                 }
             } else if (strncmp(buf, TAKE, 4) == 0) {
                 int x, y;
-                char cmd[20];
+                char cmd[5];
                 char name[20];
                 int n = sscanf(data, "%s %d %d %s", cmd, &x, &y, name);
                 player->name = name;
@@ -491,10 +493,10 @@ void *game_thread(void *arg) {
                     syslog (LOG_DEBUG, "client %d sent %s", player->fd, data);
                 }
                 int x, y;
-                char cmd[20];
+                char cmd[7];
                 sscanf(data, "%s %d %d", cmd, &x, &y);
-                char *res = "NOT IMPLEMENTED";
-                if (send(player->fd, res, sizeof(res), 0) == -1) {
+                char *name = board->cells[board->n*x+y].player->name;
+                if (send(player->fd, name, sizeof(name), 0) == -1) {
                     perror("send STATUS");
                 }
             } else {
