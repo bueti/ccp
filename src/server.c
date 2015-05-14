@@ -121,7 +121,7 @@ void cleanup() {
     pthread_barrier_destroy(&start_barrier);
 
     for(int i = 0; i < n*n; i++){
-        pthread_mutex_init(&board->cells[i].cell_mutex, NULL);
+        pthread_mutex_destroy(&board->cells[i].cell_mutex);
     }
 
     free(board->cells);
@@ -322,26 +322,36 @@ void* end_checker() {
 
         int counter = 0;
         // loop though board, check state, if all taken, end game
-        if(debug)
+        if(debug) {
             printf("looping through board\n");
+            syslog(LOG_DEBUG, "looping through board");
+        }
+
         for(int i=0; i<board->n*board->n; i++) {
             if(pthread_mutex_trylock(&board->cells[i].cell_mutex) != 0) {
                 //taken
                 if(debug) {
                     printf("%d taken by %s\n", i, board->cells[i].player->name);
+                    syslog(LOG_DEBUG, "%d taken by %s", i, board->cells[i].player->name);
                 }
                 counter++;
             } else {
                 if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
                     printf("error while unlocking\n");
+                    syslog(LOG_ERR, "error while unlocking");
                 } else {
-                    if(debug)
-                        printf("unlocked mutex - cell not taken\n");
+                    if(debug) {
+                        printf("mutex not locked -> cell not taken\n");
+                        syslog(LOG_DEBUG, "mutex not locked -> cell not  taken");
+                    }
                 }
             }
         }
-        if(debug)
+        if(debug) {
+            syslog(LOG_DEBUG, "mutex not locked -> cell not  taken");
             printf("finished looping through board\n");
+        }
+
         if(counter >= board->n*board->n) {
             printf("game over...\n");
             // TODO: Send END to all clients
@@ -368,6 +378,7 @@ void *game_thread(void *arg) {
             if (nbytes == 0) {
                 // connection closed
                 printf("server: player %d with socket %d hung up\n", player->id, player->fd);
+                syslog(LOG_INFO, "server: player %d with socket %d hung up\n", player->id, player->fd);
             } else {
                 perror("recv");
             }
