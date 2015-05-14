@@ -328,29 +328,28 @@ void* end_checker() {
 
         sleep(sleep_time);
 
-        int counter = 0;
-        // loop though board, check state, if all taken, end game
         if(debug) {
             fprintf(stderr, "looping through board\n");
             syslog(LOG_DEBUG, "looping through board");
         }
 
+        /* actual check. if name_curr == name_last go to next cell. if we reach the end we have a winner */
+        char *name_last = "free";
+        char *name_curr;
+        _Bool got_winner = true;
+
         for(int i=0; i<board->n*board->n; i++) {
             fprintf(stderr, "trying to lock cell %d\n", i);
             if(pthread_mutex_lock(&board->cells[i].cell_mutex) == 0) {
                 //taken
-                if(strcmp("free", board->cells[i].player->name) != 0) {
-                    if(debug) {
-                        fprintf(stderr, "%d taken by %s\n", i, board->cells[i].player->name);
-                        syslog(LOG_DEBUG, "%d taken by %s", i, board->cells[i].player->name);
-                    }
-                    counter++;
-                } else {
-                    if(debug) {
-                        fprintf(stderr, "cell %d not taken\n", i);
-                        syslog(LOG_DEBUG, "cell %d not  taken", i);
-                    }
+                name_curr = board->cells[i].player->name;
+                if(strcmp(name_curr, name_last) != 0) {
+                    got_winner = false;
+                    break;
                 }
+
+                name_last = name_curr;
+
                 if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
                     fprintf(stderr, "error while unlocking\n");
                     syslog(LOG_ERR, "error while unlocking");
@@ -364,16 +363,18 @@ void* end_checker() {
             }
         }
         if(debug) {
-            syslog(LOG_DEBUG, "mutex not locked -> cell not  taken");
+            syslog(LOG_DEBUG, "finished looping through board ");
             fprintf(stderr, "finished looping through board\n");
         }
 
-        if(counter >= board->n*board->n) {
-            fprintf(stderr, "game over...\n");
-            syslog(LOG_INFO, "game over, sending END");
+        if(got_winner) {
+            // we have a winner, celebrate
+            fprintf(stderr, "game over - winner is %s - sending END\n", name_curr);
+            syslog(LOG_INFO, "game over - winner is %s - sending END", name_curr);
             // TODO: Send END to all clients
             exit(0);
         }
+
     }
     return NULL;
 }
@@ -519,7 +520,7 @@ _Bool take_cell(player_t *player, int x, int y) {
     }
     if(pthread_mutex_trylock(&board->cells[cell_id].cell_mutex) == 0) {
         // successfully locked
-        board->cells[cell_id].player->name = player->name;
+        board->cells[cell_id].player = player;
         pthread_mutex_unlock(&board->cells[cell_id].cell_mutex);
         return true;
     } else {
