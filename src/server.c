@@ -37,13 +37,13 @@ pthread_barrier_t start_barrier;
 void signal_handler(int signo) {
     if(signo == SIGUSR1) {
         if(debug) {
-            printf("Caught SIGUSR1 - game can start\n");
+            fprintf(stderr, "Caught SIGUSR1 - game can start\n");
             syslog (LOG_DEBUG, "Caught SIGUSR1 - game can start");
         }
         board->game_in_progress = true;
     }
     if(signo == SIGINT) {
-        printf("Caught SIGINT, cleaning up and exiting...\n");
+        fprintf(stderr, "Caught SIGINT, cleaning up and exiting...\n");
         syslog (LOG_INFO, "Caught SIGINT - cleaning up and exiting...");
         cleanup();
     }
@@ -84,16 +84,16 @@ int main(int argc, char *argv[]) {
     board->num_players = 0;
 
     if(debug) {
-        printf("server_tid: %ld\n", (long)board->server_tid);
+        fprintf(stderr, "server_tid: %ld\n", (long)board->server_tid);
         syslog (LOG_DEBUG, "server_tid: %ld", (long)board->server_tid);
-        printf("board size: %d\n", board->n);
+        fprintf(stderr, "board size: %d\n", board->n);
         syslog (LOG_DEBUG, "board size: %d", board->n);
     }
 
     /* Setup starting barrier */
     if(pthread_barrier_init(&start_barrier, NULL, board->n/2) != 0) {
         if(debug) {
-            printf("pthread_barrier_init failed\n");
+            fprintf(stderr, "pthread_barrier_init failed\n");
         }
         syslog (LOG_ERR, "pthread_barrier_init failed");
         exit(-1);
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     pthread_t connection_handler_tid;
     int err = pthread_create(&connection_handler_tid, NULL, connection_handler, NULL);
     if (err != 0) {
-        printf("\ncan't create thread :[%s]", strerror(err));
+        fprintf(stderr, "\ncan't create thread :[%s]", strerror(err));
         syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
         exit(-1);
     }
@@ -199,7 +199,7 @@ void* connection_handler() {
     freeaddrinfo(ai); // clean up, not used anymore
 
     if(debug) {
-        printf("listener: waiting to recvfrom...\n");
+        fprintf(stderr, "listener: waiting to recvfrom...\n");
         syslog (LOG_DEBUG, "listener: waiting to recvfrom...");
     }
 
@@ -241,7 +241,7 @@ void* connection_handler() {
                             fdmax = newfd;
                         }
 
-                        printf("server: new connection from %s on "
+                        fprintf(stderr, "server: new connection from %s on "
                             "socket %d\n",
                             inet_ntop(remoteaddr.ss_family,
                                 get_in_addr((struct sockaddr*)&remoteaddr),
@@ -269,7 +269,7 @@ void* connection_handler() {
 
                         int err = pthread_create(&(new_player->tid), NULL, &game_thread, new_player);
                         if (err != 0) {
-                            printf("can't create thread :[%s]", strerror(err));
+                            fprintf(stderr, "can't create thread :[%s]", strerror(err));
                             if(send(player->fd, NACK, sizeof(NACK), 0) == -1) {
                                 perror("ERROR sending NACK");
                             }
@@ -288,7 +288,7 @@ void print_board() {
     int i;
 
     for (i=0; i<board->n*board->n; i++) {
-        printf("%s ", board->cells[i].player->name);
+        fprintf(stderr, "%s ", board->cells[i].player->name);
     }
 }
 
@@ -302,22 +302,25 @@ void *get_in_addr(struct sockaddr *sa) {
 
 void* end_checker() {
     if(debug) {
-        printf("Starting end_checker\n");
+        fprintf(stderr, "Starting end_checker\n");
     }
     syslog(LOG_INFO, "starting end_checker thread: %ld", (long)board->checker_tid);
 
     while(true) {
         // wait a random amount of time http://stackoverflow.com/questions/822323/how-to-generate-a-random-number-in-c
         srand(time(NULL));
-        int sleep_time = rand() % 10 + 1;
+        int sleep_time = rand() % 30;
+        if(sleep_time == 0)
+            sleep_time++;
+
         if(debug)
-            printf("sleeping for %d\n", sleep_time);
+            fprintf(stderr, "sleeping for %d\n", sleep_time);
         sleep(sleep_time);
 
         int counter = 0;
         // loop though board, check state, if all taken, end game
         if(debug) {
-            printf("looping through board\n");
+            fprintf(stderr, "looping through board\n");
             syslog(LOG_DEBUG, "looping through board");
         }
 
@@ -325,17 +328,17 @@ void* end_checker() {
             if(pthread_mutex_trylock(&board->cells[i].cell_mutex) != 0) {
                 //taken
                 if(debug) {
-                    printf("%d taken by %s\n", i, board->cells[i].player->name);
+                    fprintf(stderr, "%d taken by %s\n", i, board->cells[i].player->name);
                     syslog(LOG_DEBUG, "%d taken by %s", i, board->cells[i].player->name);
                 }
                 counter++;
             } else {
                 if(pthread_mutex_unlock(&board->cells[i].cell_mutex) != 0) {
-                    printf("error while unlocking\n");
+                    fprintf(stderr, "error while unlocking\n");
                     syslog(LOG_ERR, "error while unlocking");
                 } else {
                     if(debug) {
-                        printf("mutex not locked -> cell not taken\n");
+                        fprintf(stderr, "mutex not locked -> cell not taken\n");
                         syslog(LOG_DEBUG, "mutex not locked -> cell not  taken");
                     }
                 }
@@ -343,11 +346,11 @@ void* end_checker() {
         }
         if(debug) {
             syslog(LOG_DEBUG, "mutex not locked -> cell not  taken");
-            printf("finished looping through board\n");
+            fprintf(stderr, "finished looping through board\n");
         }
 
         if(counter >= board->n*board->n) {
-            printf("game over...\n");
+            fprintf(stderr, "game over...\n");
             // TODO: Send END to all clients
             exit(0);
         }
@@ -371,7 +374,7 @@ void *game_thread(void *arg) {
         if (result) {
             if (nbytes == 0) {
                 // connection closed
-                printf("server: player %d with socket %d hung up\n", player->id, player->fd);
+                fprintf(stderr, "server: player %d with socket %d hung up\n", player->id, player->fd);
                 syslog(LOG_INFO, "server: player %d with socket %d hung up\n", player->id, player->fd);
             } else {
                 perror("recv");
@@ -389,7 +392,7 @@ void *game_thread(void *arg) {
             char *data = strip_copy(buf);
 
             if(debug) {
-                printf("client %d sent %s\n", player->fd, data);
+                fprintf(stderr, "client %d sent %s\n", player->fd, data);
                 syslog (LOG_INFO, "client %d sent %s, number of players: %d, game in progress: %d", player->fd, data, board->num_players, board->game_in_progress);
             }
 
@@ -403,7 +406,7 @@ void *game_thread(void *arg) {
                 }
                 if(board->game_in_progress) {
                     if (send(player->fd, START, sizeof(START), 0) == -1) {
-                        printf("error %i %i\n",player->fd,player->id);
+                        fprintf(stderr, "error %i %i\n",player->fd,player->id);
                         perror("send START");
                         return NULL;
                     }
@@ -420,20 +423,20 @@ void *game_thread(void *arg) {
                         pthread_t end_checker_tid;
                         int err = pthread_create(&(end_checker_tid), NULL, &end_checker, NULL);
                         if (err != 0) {
-                            printf("\ncan't create thread :[%s]", strerror(err));
+                            fprintf(stderr, "\ncan't create thread :[%s]", strerror(err));
                             syslog (LOG_ERR, "error creating thread: [%s]!", strerror(err));
                             exit(-1);
                         }
                         board->checker_tid = end_checker_tid;
 
                     } else if(res != 0) {
-                        printf("barrier open failed\n");
+                        fprintf(stderr, "barrier open failed\n");
                         syslog (LOG_DEBUG, "barrier open failed");
                     }
 
                     // Send Start
                     if (send(player->fd, START, sizeof(START), 0) == -1) {
-                        printf("error %i %i\n",player->fd,player->id);
+                        fprintf(stderr, "error %i %i\n",player->fd,player->id);
                         perror("send START");
                         return NULL;
                     }
@@ -446,13 +449,13 @@ void *game_thread(void *arg) {
 
                 if(n == 3) {
                     if(take_cell(player, x, y)) {
-                        printf("Cell at %d, %d successfully taken!\n", x, y);
+                        fprintf(stderr, "Cell at %d, %d successfully taken!\n", x, y);
                         if (send(player->fd, TAKEN, sizeof(TAKEN), 0) == -1) {
                             perror("send TAKEN");
                         }
                     } else {
                         // already taken
-                        printf("Cell at %d, %d already taken!\n", x, y);
+                        fprintf(stderr, "Cell at %d, %d already taken!\n", x, y);
                         if (send(player->fd, INUSE, sizeof(TAKEN), 0) == -1) {
                             perror("send INUSE");
                         }
@@ -462,7 +465,7 @@ void *game_thread(void *arg) {
             // TODO: Implement STATUS properly
             else if (strncmp(buf, STATUS, 4) == 0) {
                 if(debug) {
-                    printf("STATUS: client %d sent %s\n", player->fd, data);
+                    fprintf(stderr, "STATUS: client %d sent %s\n", player->fd, data);
                     syslog (LOG_DEBUG, "client %d sent %s", player->fd, data);
                 }
                 int x, y;
@@ -489,7 +492,7 @@ void *game_thread(void *arg) {
 _Bool take_cell(player_t *player, int x, int y) {
     int cell_id = board->n * x + y;
     if(cell_id > board->n*board->n) {
-        printf("out of range\n");
+        fprintf(stderr, "out of range\n");
         return false;
     }
     if(pthread_mutex_trylock(&board->cells[cell_id].cell_mutex) == 0) {
