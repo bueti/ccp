@@ -338,9 +338,12 @@ void* end_checker() {
         char *name_curr;
         _Bool got_winner = true;
 
+        syslog(LOG_INFO, "check loop started");
+        fprintf(stderr, "check loop started\n");
         for(int i=0; i<board->n*board->n; i++) {
-            fprintf(stderr, "trying to lock cell %d\n", i);
-            syslog(LOG_INFO, "check loop started");
+            if(debug)
+                fprintf(stderr, "trying to lock cell %d\n", i);
+
             if(pthread_mutex_lock(&board->cells[i].cell_mutex) == 0) {
                 //taken
                 name_curr = board->cells[i].player->name;
@@ -373,10 +376,8 @@ void* end_checker() {
 
             }
         }
-        if(debug) {
-            syslog(LOG_DEBUG, "finished looping through board ");
-            fprintf(stderr, "finished looping through board\n");
-        }
+        syslog(LOG_INFO, "check loop finished");
+        fprintf(stderr, "check loop finished\n");
 
         if(got_winner) {
             // we have a winner, celebrate
@@ -487,13 +488,15 @@ void *game_thread(void *arg) {
 
                 if(n == 4) {
                     if(take_cell(player, x, y)) {
-                        fprintf(stderr, "Cell at %d, %d successfully taken!\n", x, y);
+                        if(debug)
+                            fprintf(stderr, "Cell at %d, %d successfully taken!\n", x, y);
                         if (send(player->fd, TAKEN, sizeof(TAKEN), 0) == -1) {
                             perror("send TAKEN");
                         }
                     } else {
                         // already taken
-                        fprintf(stderr, "Cell at %d, %d already taken!\n", x, y);
+                        if(debug)
+                            fprintf(stderr, "Cell at %d, %d already taken!\n", x, y);
                         if (send(player->fd, INUSE, sizeof(TAKEN), 0) == -1) {
                             perror("send INUSE");
                         }
