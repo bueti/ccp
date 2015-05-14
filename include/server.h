@@ -6,6 +6,7 @@ typedef struct {
     int id;
     int fd;
     pthread_t tid;
+    int num_of_cells;
 } player_t;
 
 typedef struct {

@@ -29,6 +29,7 @@ _Bool debug = false;
 board_t *board;
 fd_set master;
 __thread player_t* player;
+player_t players[MAXPLAYERS];
 
 /* Barrier to synchronize START command */
 pthread_barrier_t start_barrier;
@@ -254,7 +255,7 @@ void* connection_handler() {
                             newfd);
 
                         board->num_players++;
-
+                        // TODO: if num_players > MAXPLAYERS send NACK
                         player_t *new_player;
                         new_player = (player_t *) malloc(sizeof(player_t));
                         new_player->name = malloc(sizeof(char)*256);
@@ -267,6 +268,13 @@ void* connection_handler() {
                         sprintf(name, "player_%i", new_player->id);
                         strcpy(new_player->name, name);
 
+                        // add player to players list
+                        for(int i=0; i<MAXPLAYERS; i++) {
+                            if(players[i].name == '\0') {
+                                players[i] = *new_player;
+                                break;
+                            }
+                        }
                         int err = pthread_create(&(new_player->tid), NULL, &game_thread, new_player);
                         if (err != 0) {
                             fprintf(stderr, "can't create thread :[%s]", strerror(err));
