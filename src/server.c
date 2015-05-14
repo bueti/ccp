@@ -78,6 +78,7 @@ int main(int argc, char *argv[]) {
 
     /* Setup board basics */
     board->server_tid = pthread_self();
+    board->checker_tid = NULL;
     board->n = n;
     board->game_in_progress = false;
     board->num_players = 0;
@@ -256,6 +257,7 @@ void* connection_handler() {
 
                         player_t *new_player;
                         new_player = (player_t *) malloc(sizeof(player_t));
+                        new_player->name = malloc(sizeof(char)*256);
 
                         new_player->id = newfd-4;
                         new_player->fd = newfd;
