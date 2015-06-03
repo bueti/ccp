@@ -442,7 +442,7 @@ void *game_thread(void *arg) {
                 if(send(player->fd, res, sizeof(res), 0) == -1) {
                     perror("send");
                 }
-                if(board->game_in_progress || board->num_players/2 >= board->n) {
+                if(board->game_in_progress || board->num_players >= board->n/2) {
                     if (send(player->fd, START, sizeof(START), 0) == -1) {
                         fprintf(stderr, "error %i %i\n",player->fd,player->id);
                         perror("send START");
