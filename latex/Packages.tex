@@ -1,0 +1,120 @@
+\usepackage[utf8]{inputenc}
+% Schriftart mit Umlauten
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{relsize} % Schriftgröße relativ festlegen
+\usepackage[babel,german=quotes]{csquotes}
+\usepackage{xspace}
+
+% Anpassung Seitenlayout
+\usepackage[
+    automark, % Kapitelangaben in Kopfzeile automatisch erstellen
+    headsepline, % Trennlinie unter Kopfzeile
+    ilines % Trennlinie linksbündig ausrichten
+]{scrpage2}
+% Einfache Definition der Zeilenabstände und Seitenränder etc.
+\usepackage{setspace}
+\usepackage{wrapfig}
+
+\usepackage[a4paper,pdftex]{geometry}	% A4paper margins
+\setlength{\oddsidemargin}{5mm}			% Remove 'twosided' indentation
+\setlength{\evensidemargin}{5mm}
+
+\usepackage[ngerman]{babel}
+\usepackage[protrusion=true,expansion=true]{microtype}	
+\usepackage{amsmath,amsfonts,amsthm,amssymb}
+
+% Tables
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tabularx}
+
+% Lists
+\usepackage{enumitem}
+
+% Reference to Name
+\usepackage{nameref}
+
+% Graphics
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{wrapfig}
+
+% Hyperlinks
+\usepackage{color}
+\definecolor{black}{gray}{0} % 10% gray
+\usepackage[colorlinks=true,linkcolor=black,citecolor=blue,linktocpage,linktoc=all,urlcolor=blue]{hyperref}
+\usepackage[normalem]{ulem}
+\setcounter{secnumdepth}{5}
+\setcounter{tocdepth}{2}
+
+% Glossary definition
+\usepackage[xindy,nopostdot,toc]{glossaries}
+\renewcommand*{\glstextformat}[1]{\textcolor{blue}{#1}}
+\makeglossaries
+
+% Bibliography
+\usepackage[style=numeric-comp,backend=bibtex]{biblatex}
+\bibliography{bib}
+
+%% Makros
+\newcommand*{\eg}{e.g.\@\xspace}
+\newcommand*{\ie}{i.e.\@\xspace}
+
+\makeatletter
+\newcommand*{\etc}{%
+    \@ifnextchar{.}%
+        {etc}%
+        {etc.\@\xspace}%
+}
+\makeatother
+
+% Landscape mode for certain pages
+\usepackage{pdflscape}
+
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\newcommand{\smark}{\ding{59}}%
+
+% Shell Formatting
+\newcommand{\shellcmd}[1]{\\\indent\indent\texttt{\footnotesize\# #1}\\}
+
+% Code snippets
+%\usepackage{minted}
+\usepackage{xcolor}
+\usepackage{listings}
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Ruby,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true
+  tabsize=3
+}
+\lstset{basicstyle=\ttfamily,
+  showstringspaces=false,
+  commentstyle=\color{red},
+  keywordstyle=\color{blue}
+}
+
+\usepackage{enumitem}
+\def\namedlabel#1#2{\begingroup
+    #2%
+    \def\@currentlabel{#2}%
+    \phantomsection\label{#1}\endgroup
+}
+\makeatother

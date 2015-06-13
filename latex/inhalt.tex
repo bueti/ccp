@@ -1,0 +1,102 @@
+\chapter{Projekt}
+
+\section{Abstract}
+\label{abstract}
+
+
+\chapter{Einleitung}
+
+
+\section{Aufgabenstellung}
+
+\chapter{Anleitung}
+Ziel des Spiels ist es alle Felder dies Spielfelds zu besitzen.
+
+Das Spielfeld ist ein Quadrat der Seitenlänge $n$, wobei $$n \geq  4$$ ist. Die Koordinaten des Spielfeldes sind somit $$(0..(n-1), 0..(n-1))$$.
+
+\section{Spielablauf}
+\begin{enumerate}
+	\item Der Server startet und wartet auf $\frac{n}{2}$ Spieler
+	\item Sobald $\frac{n}{2}$ Spieler verbunden sind, kann jeder Spieler versuchen Felder zu erobern
+	\item Es können während des Spiels neue Spieler hinzukommen oder Spieler das Spiel verlassen
+	\item Der Server prüft alle $y$ Sekunden den konsistenten Spielfeldstatus , wobei $$1 \leq y \leq 30$$
+	\item Wenn ein Spieler zu diesem Zeitpunkt alle Felder besitzt, hat er gewonnen und das Spiel wird beendet
+\end{enumerate}
+
+\section{Spiel-Protokol}
+\begin{itemize}
+	\item Befehle werden mit \textbackslash n abgeschlossen.
+	\item Kein Befehl ist länger als 256 Zeichen inklusive dem \textbackslash n.
+	\item Jeder Spieler kann nur 1 Kommando senden und muss auf die Antwort warten.
+\end{itemize}
+
+\subsection{Anmeldung}
+\begin{lstlisting}[language=bash,caption={Erfolgreiche Anmeldung}]
+Client: HELLO\n
+Server: SIZE n\n	
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash,caption={Nicht erfolgreiche Anmeldung}]
+Client: HELLO\n
+Server: NACK\n
+    -> Trennt die Verbindung
+\end{lstlisting}
+
+
+\subsection{Spielstart}
+Der Server wartet auf $\frac{n}{2}$ Verbindungen vor dem Start.
+\begin{lstlisting}[language=bash,caption={Spielstart}]
+Server: START\n
+Client: - (erwidert nichts, weiss das es gestartet hat)
+\end{lstlisting}
+
+\subsection{Feld erobern}
+Wenn kein anderer Client gerade einen TAKE Befehl für das selbe Feld sendet, kann ein Client es nehmen.
+\begin{lstlisting}[language=bash,caption={Erfolgreiche Eroberung}]
+Client: TAKE X Y NAME\n
+Server: TAKEN\n
+\end{lstlisting}
+
+Wenn ein oder mehrere andere Clients gerade einen TAKE Befehl für das selbe Feld sendet, sind alle bis auf der erste nicht erfolgreich.
+
+\begin{lstlisting}[language=bash,caption={Nichterfolgreiche Eroberung}]
+Client: TAKE X Y NAME\n
+Server: INUSE\n
+\end{lstlisting}
+
+\subsection{Besitz anzeigen}
+\begin{lstlisting}[language=bash,caption={Spielstart}]
+Client: STATUS X Y\n
+Server: Name-des-Spielers\n
+\end{lstlisting}
+
+\subsection{Spielende}
+Sobald ein Client alle Felder besitzt wird der Gewinner bekanntgegeben. Diese Antwort kann auf jeden Client Befehl kommen, mit Ausnahme der Anmeldung kommen.
+\begin{lstlisting}[language=bash,caption={Spielstart}]
+Server: END Name-des-Spielers\n
+Client: - (beendet sich)
+\end{lstlisting}
+
+\section{Bedingungen für die Implementation}
+\begin{itemize}
+	\item Es gibt keinen globalen Lock
+	\item Der Server speichert den Namen des Feldbesitzers
+	\item Kommunikation via TCP/IP
+	\item fork + shm (empfohlen)
+	\begin{itemize}
+		\item oder pthreads
+		\item für jede Verbindung einen prozess/thread
+		\item Hauptthread/prozess kann bind/listen/accept machen
+		\item Rating Prozess/Thread zusätzlich im Server
+	\end{itemize}
+	\item Fokus liegt auf dem Serverteil
+	\item Client ist hauptsächlich zum Testen und "Spass haben" da
+	\item Server wird durch Skript vom Dozent getestet
+	\item Locking, gleichzeitiger Zugriff im Server lösen
+	\item Debug-Ausgaben von Client/Server auf stderr
+\end{itemize}
+
+\chapter{Weg, Probleme, Lösungen}
+
+\chapter{Fazit}
+ 

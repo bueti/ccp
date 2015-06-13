@@ -40,3 +40,6 @@ bin/*
 .DS_Store
 
 lab/
+
+# Latex
+**/.texpadtmp

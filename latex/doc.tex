@@ -1,0 +1,94 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LaTeX Template: Project Titlepage
+%
+% Source: http://www.howtotex.com
+% Date: April 2011
+%
+% --------------------------------------------------------------------
+% Preamble
+% --------------------------------------------------------------------
+\documentclass[
+    12pt, % Schriftgröße
+    DIV10,
+    a4paper, % Papierformat
+    oneside, % einseitiges Dokument
+    % notitlepage, % es wird eine Titelseite verwendet, aber mit Abstract
+    parskip=half, % Abstand zwischen Absätzen (halbe Zeile)
+    headings=normal, % Größe der Überschriften verkleinern
+    listof=totoc, % Verzeichnisse im Inhaltsverzeichnis aufführen
+    bibliography=totoc, % Literaturverzeichnis im Inhaltsverzeichnis aufführen
+    index=totoc, % Index im Inhaltsverzeichnis aufführen
+    captions=tableheading, % Beschriftung von Tabellen unterhalb ausgeben
+    final % Status des Dokuments (final/draft)
+]{scrreprt} %{scrreprt/scrartclt}
+
+% Add packages
+\input{Packages}
+
+% Page Styling
+\input{Style}
+
+%% Glossary
+\input{Glossary}
+
+\begin{document}
+\begin{titlepage}
+\begin{center}
+  \bfseries
+  \huge Zürcher Hochschule für Angewandte Wissenschaften
+  \vskip-.1in
+  \rule{\textwidth}{1.5pt}
+  \vskip.5in
+
+  \normalsize \textsc{Seminararbeit}
+  \vskip.25in
+  \emph{\Large Concurrent C Programming}
+
+  \vspace*{2cm}
+  \includegraphics[scale=.2]{logo}
+  \end{center}
+  \vspace*{1cm}
+
+\begin{minipage}{.5\textwidth}
+  \begin{flushleft}
+    \bfseries\large Dozent:\par \emph{Nico Schottelius}\par ???@zhaw.ch
+  \end{flushleft}
+\end{minipage}
+\hskip.1\textwidth
+\begin{minipage}{.5\textwidth}
+  \begin{flushleft}
+    \bfseries\large Kandidat:\par \emph{Benjamin Bütikofer}\par bbutik@microsoft.com
+    \par Matr.: 11-480-993
+  \end{flushleft}
+\end{minipage}
+
+\vskip1in
+
+\centering
+\bfseries
+\normalsize \today
+\end{titlepage}
+\pagenumbering{Roman}
+% --------------------------------------------------------------------
+% Begin document
+% ------------------------------------------------------------------------------
+\tableofcontents
+
+%\setcounter{page}{1}		% Set page numbering to begin on this page
+\clearpage
+\pagenumbering{arabic} 
+% Chapters: 
+%%%%%%%%%%%%%%%%%%% Project Overview %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\include{inhalt}
+
+%%%%%%%%%%%%%%%%%%% Appendix %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\listoffigures
+%\listoftables
+\printbibliography
+\printglossaries
+
+
+% ------------------------------------------------------------------------------
+% End document
+% ------------------------------------------------------------------------------
+\end{document}

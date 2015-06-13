@@ -1,0 +1,32 @@
+% Zeilenabstand 1,5 Zeilen -----------------------------------------------------
+\onehalfspacing
+
+% Seitenränder -----------------------------------------------------------------
+\setlength{\topskip}{\ht\strutbox} % behebt Warnung von geometry
+\geometry{paper=a4paper,left=35mm,right=35mm,top=30mm}
+
+% Kopf- und Fußzeilen ----------------------------------------------------------
+\pagestyle{scrheadings}
+% Kopf- und Fußzeile auch auf Kapitelanfangsseiten
+\renewcommand*{\chapterpagestyle}{scrheadings} 
+% Schriftform der Kopfzeile
+%\renewcommand{\headfont}{\normalfont}
+\setkomafont{pagehead}{\normalfont}
+\setkomafont{pagefoot}{\normalfont}
+
+% Fußzeile
+\setfootsepline[text]{.4pt}
+\ifoot{2015 Microsoft Corp.}
+\cfoot{Benjamin Bütikofer}
+\ofoot{\pagemark}
+
+% sonstige typographische Einstellungen ----------------------------------------
+
+% erzeugt ein wenig mehr Platz hinter einem Punkt
+\frenchspacing 
+
+% Schusterjungen und Hurenkinder vermeiden
+\clubpenalty = 10000
+\widowpenalty = 10000 
+\displaywidowpenalty = 10000
+
