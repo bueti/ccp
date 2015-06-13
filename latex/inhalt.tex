@@ -5,14 +5,9 @@
 
 
 \chapter{Einleitung}
+Im Seminar ``Concurrent C Programming'' welches als Vertiefung zum Kurs Systemsoftware und Betriebssystemprogrammierung gedacht ist, wurde die Aufgabe gestellt ein Multiuser und Netwerkfähiges Client/Server Spiel in C zu entwickeln.
 
-
-\section{Aufgabenstellung}
-
-\chapter{Anleitung}
-Ziel des Spiels ist es alle Felder dies Spielfelds zu besitzen.
-
-Das Spielfeld ist ein Quadrat der Seitenlänge $n$, wobei $$n \geq  4$$ ist. Die Koordinaten des Spielfeldes sind somit $$(0..(n-1), 0..(n-1))$$.
+Ziel des Spiels ist es alle Felder dies Spielfelds zu besitzen. Das Spielfeld ist ein Quadrat der Seitenlänge $n$, wobei $$n \geq  4$$ ist. Die Koordinaten des Spielfeldes sind somit $$(0..(n-1), 0..(n-1))$$.
 
 \section{Spielablauf}
 \begin{enumerate}
@@ -42,8 +37,8 @@ Server: NACK\n
     -> Trennt die Verbindung
 \end{lstlisting}
 
-
 \subsection{Spielstart}
+\label{spielstart}
 Der Server wartet auf $\frac{n}{2}$ Verbindungen vor dem Start.
 \begin{lstlisting}[language=bash,caption={Spielstart}]
 Server: START\n
@@ -96,7 +91,48 @@ Client: - (beendet sich)
 	\item Debug-Ausgaben von Client/Server auf stderr
 \end{itemize}
 
-\chapter{Weg, Probleme, Lösungen}
+\chapter{Planung und Implementation}
+Bevor mit der Implementation begonnen wurde, wurden die Anforderungen genauer Analysiert und den Spielablauf mit einem simplen Blocks-and-Arrows Diagram zu Papier gebracht.
+
+Mit dieser Visualisierung konnte im nächsten Schritt die Anforderungen an den Server geprüft werden. Danach wurde ein weiteres Diagram angefertigt, welches die Funktionalität des Servers und die Abhängigkeiten der einzelnen Komponenten des Servers aufzeigt, siehe Abbildung \ref{fig:server}.
+
+%\begin{landscape}
+%\thispagestyle{empty}
+%\noindent
+\begin{figure}[!ht]
+  %\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]	{images/server}
+  \includegraphics[max size={\textwidth}{\textheight}]{images/server}
+  \caption{\label{fig:server}Server}
+\end{figure}
+%\end{landscape}
+
+\section{Server}
+Wie Abbildung \ref{fig:server} zu entnehmen ist, besteht der Server aus drei Hauptkomponenten:
+\begin{itemize}
+	\item Listener
+	\item Game Thread
+	\item End-Checker
+\end{itemize}
+
+\subsection{Listener}
+Der Listener ist verantwortlich neue Verbindungen anzunehmen und speichern. Sobald genügend Clients verbunden sind, soll er auch die START Nachricht wie in \ref{spielstart} definiert an alle Clients versenden.
+
+\subsection{Game Thread}
+Für jeden Spieler wird ein neuer Thread gestartet. Der Thread behandelt alle Nachrichten des jeweiligen Clients und schickt auch die Antworten an ihn.
+
+\subsection{End-Checker}
+Der End-Checker Thread wird am Anfang einmal gestartet und läuft in einer Dauerschleife bis ein Gewinner ermittelt ist. Git es einen Gewinner, schickt der End-Checker die END Nachricht.
+
+In der Aufgabenstellung wird gefordert, dass kein globaler Lock verwendet wird. Es wird aber auch verlangt, dass das Spielfeld konsistent geprüft werden muss. Da sich diese zwei Anforderungen jedoch nicht vereinbaren lassen, habe ich mich entschieden eine Lösung ohne globalen Lock zu entwickeln. Dies hat jedoch zur Folge, dass ein Spielfeld welches am Anfang getestet wird beim Abschluss der Prüfung aller Felder einen neuen Besitzer haben kann.
+
+\section{Client}
+Der Client ist äusserst simple implementiert und beherrscht nur einen Modus.
 
 \chapter{Fazit}
- 
+Das Projekt war äusserst interessant und hat neben viel Ärger auch sehr viel Freude bereitet. Es war das erste Projekt welches ich in C geschrieben habe, demzufolge war die Lernkurve auch ziemlich Steil. Hinzukommt, dass ich beruflich nicht Vollzeit programmiere und es schon eine Weile her war seit meinem letzten Programmier-Projekt.
+
+Glücklicherweise ist beinahe jedes Problem schon einmal gelöst worden und es gibt ausreichend Dokumentation im Internet. Auch der Tipp mit valgrind war äusserst nützlich. 
+
+Das Projekt zeigte mir auch deutlich warum Sprachen wie Java und C\# soviel auftrieb erhalten haben. Muss man sich doch in C jede noch so kleine Funktion in der Regel selbst bauen. Ein TCP Server in Java kann inner Minuten geschrieben werden ohne das man sich gross Gedanken machen muss, wie man es im Hintergrund abläuft.
+
+Auch der Umgang mit dem Speicher (Speicherreservierung) hat viel Nerven gekostet - umso schöner jedoch, wenn man dann endlich auch den letzten Fehler ausgeschliffen hat!
