@@ -1,15 +1,15 @@
-\chapter{Projekt}
 
-\section{Abstract}
-\label{abstract}
 
 
 \chapter{Einleitung}
-Im Seminar ``Concurrent C Programming'' welches als Vertiefung zum Kurs Systemsoftware und Betriebssystemprogrammierung gedacht ist, wurde die Aufgabe gestellt, ein Multiuser und Netwerkfähiges Client/Server Spiel in C zu entwickeln.
 
-Ziel des Spiels ist es alle Felder dies Spielfelds zu besitzen. Das Spielfeld ist ein Quadrat der Seitenlänge $n$, wobei $$n \geq  4$$ ist. Die Koordinaten des Spielfeldes sind somit $$(0..(n-1), 0..(n-1))$$.
+\section{Abstract}
+\label{abstract}
+Dieser Bericht beschreibt die Implementierung eines multiuser, netzwerkfähigen Client/Server Spiels welches in C geschrieben wurde. Die Arbeit wurde im Seminar ``Concurrent C Programming'' durchgeführt. Das Seminar ist als Vertiefung zu den Kurse Systemsoftware und Betriebssystemprogrammierung gestaltet.
 
 \section{Spielablauf}
+Ziel des Spiels ist es alle Felder dies Spielfelds zu besitzen. Das Spielfeld ist ein Quadrat der Seitenlänge $n$, wobei $$n \geq  4$$ ist. Die Koordinaten des Spielfeldes sind somit $$(0..(n-1), 0..(n-1))$$.
+
 \begin{enumerate}
 	\item Der Server startet und wartet auf $\frac{n}{2}$ Spieler
 	\item Sobald $\frac{n}{2}$ Spieler verbunden sind, kann jeder Spieler versuchen Felder zu erobern
@@ -26,12 +26,12 @@ Ziel des Spiels ist es alle Felder dies Spielfelds zu besitzen. Das Spielfeld is
 \end{itemize}
 
 \subsection{Anmeldung}
-\begin{lstlisting}[language=bash,caption={Erfolgreiche Anmeldung}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Erfolgreiche Anmeldung}]
 Client: HELLO\n
 Server: SIZE n\n	
 \end{lstlisting}
 
-\begin{lstlisting}[language=bash,caption={Nicht erfolgreiche Anmeldung}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Nicht erfolgreiche Anmeldung}]
 Client: HELLO\n
 Server: NACK\n
     -> Trennt die Verbindung
@@ -40,34 +40,34 @@ Server: NACK\n
 \subsection{Spielstart}
 \label{spielstart}
 Der Server wartet auf $\frac{n}{2}$ Verbindungen vor dem Start.
-\begin{lstlisting}[language=bash,caption={Spielstart}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Spielstart}]
 Server: START\n
 Client: - (erwidert nichts, weiss das es gestartet hat)
 \end{lstlisting}
 
 \subsection{Feld erobern}
 Wenn kein anderer Client gerade einen TAKE Befehl für das selbe Feld sendet, kann ein Client es nehmen.
-\begin{lstlisting}[language=bash,caption={Erfolgreiche Eroberung}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Erfolgreiche Eroberung}]
 Client: TAKE X Y NAME\n
 Server: TAKEN\n
 \end{lstlisting}
 
 Wenn ein oder mehrere andere Clients gerade einen TAKE Befehl für das selbe Feld sendet, sind alle bis auf der erste nicht erfolgreich.
 
-\begin{lstlisting}[language=bash,caption={Nichterfolgreiche Eroberung}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Nichterfolgreiche Eroberung}]
 Client: TAKE X Y NAME\n
 Server: INUSE\n
 \end{lstlisting}
 
 \subsection{Besitz anzeigen}
-\begin{lstlisting}[language=bash,caption={Spielstart}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Besitz anzeigen}]
 Client: STATUS X Y\n
 Server: Name-des-Spielers\n
 \end{lstlisting}
 
 \subsection{Spielende}
 Sobald ein Client alle Felder besitzt wird der Gewinner bekanntgegeben. Diese Antwort kann auf jeden Client Befehl kommen, mit Ausnahme der Anmeldung kommen.
-\begin{lstlisting}[language=bash,caption={Spielstart}]
+\begin{lstlisting}[language=bash,numbers=none,caption={Spielende}]
 Server: END Name-des-Spielers\n
 Client: - (beendet sich)
 \end{lstlisting}
@@ -94,12 +94,19 @@ Client: - (beendet sich)
 \chapter{Planung und Implementation}
 Bevor mit der Implementation begonnen wurde, wurden die Anforderungen analysiert und den Spielablauf mit einem simplen Blocks-and-Arrows Diagram zu Papier gebracht.
 
+\begin{figure}[!ht]
+  %\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]	{images/server}
+  \includegraphics[max size={\textwidth}{\textheight}]{images/flow1}
+  \caption{\label{fig:server}Spielablauf}
+\end{figure}
+
+
 Mit dieser Visualisierung konnte im nächsten Schritt die Anforderungen an den Server ermittelt werden. Danach wurde ein weiteres Diagram angefertigt, welches die Funktionalität des Servers und die Abhängigkeiten der einzelnen Komponenten des Servers aufzeigt, siehe Abbildung \ref{fig:server}.
 
 \begin{figure}[!ht]
   %\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]	{images/server}
   \includegraphics[max size={\textwidth}{\textheight}]{images/server}
-  \caption{\label{fig:server}Server}
+  \caption{\label{fig:server}Blocks and Arrows Diagram Server Prozess}
 \end{figure}
 
 Das Erstellen dieses Diagrams beanspruchte einiges an Zeit und war ein iterativer Prozess, weil nach jeder Version neue Fallstricke ersichtlich wurden. Doch die Arbeit lohnte sich, da die Grafik die Implementation enorm vereinfachte weil es klar ersichtlich wurde, was welche Komponente zu erfüllen hat.
@@ -115,13 +122,47 @@ Wie Abbildung \ref{fig:server} zu entnehmen ist, besteht der Server aus drei Hau
 \subsection{Main Server Thread}
 Der Main Server Thread ist verantwortlich den Server zu starten und neue Verbindungen anzunehmen und zu speichern. Sobald genügend Clients verbunden sind, soll er auch die START Nachricht wie in \ref{spielstart} definiert an alle Clients versenden.
 
-Beim Starten des Servers wird als erstes die Umgebung aufgesetzt. Das beinhaltet neben dem Registrieren der Signal-Handlern auch das initialisieren des Logging Frameworks, dem Verarbeiten der Kommandozeilenparametern und dem Setup des Spielfeldes. Um allen Clients den Start-Befehl zur selben Zeit zu schicken, wird eine PThread-Barriere verwendet und auch am Anfang initialisiert.
+Beim Starten des Servers wird als erstes die Umgebung aufgesetzt. Das beinhaltet neben dem Registrieren der Signal-Handlern auch das initialisieren des Logging Frameworks, dem Verarbeiten der Kommandozeilenparametern und dem Setup des Spielfeldes. Um allen Clients den Start-Befehl zur selben Zeit zu schicken, wird eine Pthread-Barriere verwendet und auch am Anfang initialisiert.
 
 Sind all diese Schritte erfolgreich abgeschlossen, wird ein neuer Thread erstellt welcher die eingehenden Verbindungen verarbeiten wird. 
 
 \subsubsection{Connection Handler}
 Der Connection Handler basiert auf den Erklärungen von \cite{byte-stream-server}. Wenn eine neue Verbindung zum Server erstellt wird, wird dieser ein neuer File Descriptor zugewiesen. 	Danach wird ein neues Spieler struct erstellt und der File Descriptor wird darin gespeichert. Nun ist die Verbindungsinitialisierung komplett und ein Game Thread wird erstellt. Falls etwas schiefgeht wird ein NACK an den Client geschickt und die Verbindung wird terminiert.
 
+\subsubsection{Verwendete Datenstrukturen}
+Die Spielinformationen werden in drei Structs verwaltet. Der Spielerinformation wird in \texttt{player\_t} gespeichert und beinhaltet neben dem Namen auch den File Descriptor.
+
+\begin{lstlisting}[language=C,caption={Player Struct}]
+typedef struct {
+    char *name;
+    int id;
+    int fd;
+    pthread_t tid;
+    int num_of_cells;
+} player_t;
+\end{lstlisting}
+
+Ein Spielfeld (Board) besteht aus mehreren Zellen. Da eine Zelle mehrere Informationen verwalten muss, gibt es auch für die Zelle ein eigenes Struct. Im Board stehen neben einem Array aus Zellen auch noch weitere Informationen wie zum Beispiel die Grösse des Spielfeldes und die Anzahl der angemeldeten Spieler.
+
+\begin{lstlisting}[language=c,caption={Board Struct}]
+typedef struct {
+    int n;
+    int num_players;
+    pthread_t server_tid;
+    pthread_t checker_tid;
+    _Bool game_in_progress;
+    cell_t *cells;
+} board_t;
+\end{lstlisting}
+
+Die Zelle ist sehr einfach gehalten. Jede Zelle hat einen Mutex und einen Pointer zu einem Spieler. Ist das Feld nicht vergeben, wird der dummy Spieler ``free'' gespeichert.
+
+\begin{lstlisting}[language=c,caption={Cell Struct}]
+typedef struct {
+    pthread_mutex_t cell_mutex;
+    player_t *player;
+} cell_t;
+\end{lstlisting}
  
 \subsection{Game Thread}
 Der Game Thread ist eine unendliche \texttt{while}-Schleife die mit \texttt{recv} auf einkommende Befehle hört.
@@ -143,7 +184,13 @@ Sobald der Lock erfolgreich akquiriert wurde, wird geprüft, ob der momentane Ze
 Falls der Checker einen Gewinner ermittelt hat, wird jedem Spieler die \texttt{END} Nachricht geschickt und der Thread beendet sich.  
 
 \section{Client}
-Der Client ist äusserst simple implementiert und beherrscht nur einen Modus.
+Da die Zeit etwas knapp wurde, ist nur eine Client Strategie implementiert worden.
+
+\subsection{Retry once}
+Der Client beginnt beim Feld mit den Koordinaten $(1, 1)$ und versucht das Feld zu besetzen. Ist der Versuch das Feld zu belegen gescheitert, wird ein weiteres Mal versucht das Feld in besitz zunehmen. Schlägt auch der zweite Versuch fehl, wird mit dem nächsten Feld weitergemacht.
+
+Weitere Optimierungen sind wegen Zeitmangels nicht implementiert worden.
+
 
 \chapter{Fazit}
 Das Projekt war äusserst interessant und hat neben viel Ärger auch sehr viel Freude bereitet. Es war das erste Projekt welches ich in C geschrieben habe, demzufolge war die Lernkurve auch ziemlich Steil. Hinzukommt, dass ich beruflich nicht Vollzeit programmiere und es schon eine Weile her war seit meinem letzten Programmier-Projekt.

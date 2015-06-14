@@ -84,27 +84,32 @@
 
 % Code snippets
 %\usepackage{minted}
-\usepackage{xcolor}
+%\usepackage{xcolor}
+\usepackage[usenames,dvipsnames]{xcolor}
 \usepackage{listings}
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
 \definecolor{mauve}{rgb}{0.58,0,0.82}
+\definecolor{light-grey}{RGB}{223,223,223}
 
 \lstset{frame=tb,
-  language=Ruby,
+  backgroundcolor=\color{light-grey},
+  frame=single,
+  language=C,
   aboveskip=3mm,
   belowskip=3mm,
   showstringspaces=false,
   columns=flexible,
   basicstyle={\small\ttfamily},
-  numbers=none,
+  numbers=left,
   numberstyle=\tiny\color{gray},
   keywordstyle=\color{blue},
   commentstyle=\color{dkgreen},
   stringstyle=\color{mauve},
   breaklines=true,
-  breakatwhitespace=true
-  tabsize=3
+  breakatwhitespace=true,
+  tabsize=2,
+  captionpos=b
 }
 \lstset{basicstyle=\ttfamily,
   showstringspaces=false,
