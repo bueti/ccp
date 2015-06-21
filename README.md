@@ -4,6 +4,8 @@ This is a server and client implementation for [Concurrent C Programming / Semin
 ## Compilation
 Running `make` will produce a `server` and `client` executable in the `bin` folder.
 
+For debugging purposes run `make debug`, this will build the binaries with debug symbols and no optimizations.
+
 ## Start the server
     ./bin/server -n <size> [-d]
 
