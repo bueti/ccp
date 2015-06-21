@@ -127,7 +127,7 @@ Beim Starten des Servers wird als erstes die Umgebung aufgesetzt. Das beinhaltet
 Sind all diese Schritte erfolgreich abgeschlossen, wird in einem neuen Thread der Connection Handler gestartet welcher, wie der Name schon sagt, die eingehenden Verbindungen verarbeiten wird.
 
 \subsubsection{Connection Handler}
-Der Connection Handler basiert auf den Erklärungen von \cite{byte-stream-server} und \cite{apue}. Wenn eine neue Verbindung zum Server erstellt wird, wird dieser ein neuer File Descriptor zugewiesen. 	Danach wird ein neues Spieler struct erstellt und der File Descriptor wird darin gespeichert. Nun ist die Verbindungsinitialisierung komplett und ein Game Thread wird erstellt. Falls etwas schiefgeht wird ein NACK an den Client geschickt und die Verbindung wird terminiert.
+Der Connection Handler basiert auf den Erklärungen von \cite{byte-stream-server} und \cite{apue}. Wenn eine neue Verbindung zum Server erstellt wird, wird dieser ein neuer File Descriptor zugewiesen. 	Danach wird ein neues Spieler struct erstellt und der File Descriptor wird darin gespeichert. Nun ist die Verbindungsinitialisierung komplett und ein Game Thread wird erstellt. Falls die Initialisierung fehlschlägt, wird ein NACK an den Client geschickt und die Verbindung wird terminiert.
 
 \subsubsection{Verwendete Datenstrukturen}
 Die Spielinformationen werden in drei Structs verwaltet. Kernighan und Ritchie definieren ein \texttt{struct} als 
