@@ -155,7 +155,10 @@ void start_simple(int fd, player_t *player) {
     while(isRunning || counter<maxTries) {
         for (int i=0; i<size; i++) {
             for (int j=0; j<size; j++) {
-                asprintf(&msg, "%s %d %d %s\n", TAKE, i, j, player->name);
+                int ret = asprintf(&msg, "%s %d %d %s\n", TAKE, i, j, player->name);
+                if(ret == -1)
+                    printf("asprintf failed\n");
+
                 printf("Sending %s to server\n", msg);
 
                 if (send(fd, msg, strlen(msg), 0) == -1) {

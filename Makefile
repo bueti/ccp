@@ -2,7 +2,8 @@ CC := gcc
 TARGETDIR := bin
 SRCDIR := src
 
-CFLAGS := -Wall -Wpedantic -Wextra -O0 -std=gnu99 -pthread -D_GNU_SOURCE
+CFLAGS := -Wall -Wpedantic -Wextra -O3 -std=gnu99 -pthread -D_GNU_SOURCE
+CFLAGS_DEBUG := -g -Wall -Wpedantic -Wextra -std=gnu99 -pthread -D_GNU_SOURCE
 INC := -I ./include -L ./lib
 LIB := -L ./lib -lrt -lpthread
 
@@ -19,7 +20,7 @@ server:
 d_server:
 	@echo " Building Server..."
 	@${MKDIR_P} ${TARGETDIR}
-	@echo " $(CC) -g $(CFLAGS) $(INC) $(SRCDIR)/server.c $(SRCDIR)/server_optparse.c -o $(TARGETDIR)/server"; $(CC) -g $(CFLAGS) $(INC) $(SRCDIR)/server.c $(SRCDIR)/server_optparse.c -o $(TARGETDIR)/server $(LIB);
+	@echo " $(CC) $(CFLAGS_DEBUG) $(INC) $(SRCDIR)/server.c $(SRCDIR)/server_optparse.c -o $(TARGETDIR)/server"; $(CC) -g $(CFLAGS_DEBUG) $(INC) $(SRCDIR)/server.c $(SRCDIR)/server_optparse.c -o $(TARGETDIR)/server $(LIB);
 
 client:
 	@${MKDIR_P} ${TARGETDIR}
@@ -29,7 +30,7 @@ client:
 d_client:
 	@${MKDIR_P} ${TARGETDIR}
 	@echo " Building Client..."
-	@echo " $(CC) -g $(CFLAGS) $(INC) $(SRCDIR)/client.c $(SRCDIR)/client_optparse.c -o $(TARGETDIR)/client"; $(CC) -g $(CFLAGS) $(INC) $(SRCDIR)/client.c $(SRCDIR)/client_optparse.c -o $(TARGETDIR)/client $(LIB);
+	@echo " $(CC) $(CFLAGS_DEBUG) $(INC) $(SRCDIR)/client.c $(SRCDIR)/client_optparse.c -o $(TARGETDIR)/client"; $(CC) $(CFLAGS_DEBUG) $(INC) $(SRCDIR)/client.c $(SRCDIR)/client_optparse.c -o $(TARGETDIR)/client $(LIB);
 
 .PHONY clean:
 	@echo " Cleaning...";
