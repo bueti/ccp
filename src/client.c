@@ -14,7 +14,9 @@
 #include "commands.h"
 #include "shared.h"
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once
+#define MAXDATASIZE 256 // max number of bytes we can get at once
+#define PORT "1666"
+#define HOST "localhost"
 
 /*
 * Global Vars
@@ -25,6 +27,9 @@ char *port;
 int size;
 
 int main(int argc, char *argv[]) {
+    hostname = HOST;
+    port = PORT;
+
     // Parse command line
     if(!optparse(argc, argv))
         exit(1);
