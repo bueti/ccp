@@ -442,13 +442,21 @@ void *game_thread(void *arg) {
                 if(send(player->fd, res, sizeof(res), 0) == -1) {
                     perror("send");
                 }
-                if(board->game_in_progress || board->num_players >= board->n/2) {
+                if(debug) {
+                    fprintf(stderr, "game_in_progress: %d\n", board->game_in_progress);
+                    fprintf(stderr, "num_players: %d\n", board->num_players);
+                    syslog (LOG_DEBUG, "game_in_progress: %d", board->game_in_progress);
+                    syslog (LOG_DEBUG, "num_players: %d", board->num_players);
+                }
+                // Send start immediately if game is already in progress
+                if(board->game_in_progress) {
                     if (send(player->fd, START, sizeof(START), 0) == -1) {
                         fprintf(stderr, "error %i %i\n",player->fd,player->id);
                         perror("send START");
-                        return NULL;
                     }
-                } else {
+                }
+                // else wait on barrier
+                else {
                     int retcode = pthread_barrier_wait(&start_barrier);
                     if(retcode == PTHREAD_BARRIER_SERIAL_THREAD) {
                         // Notify all players
@@ -476,7 +484,6 @@ void *game_thread(void *arg) {
                     if (send(player->fd, START, sizeof(START), 0) == -1) {
                         fprintf(stderr, "error %i %i\n",player->fd,player->id);
                         perror("send START");
-                        return NULL;
                     }
                     free(res);
                 }
