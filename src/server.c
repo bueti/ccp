@@ -460,6 +460,7 @@ void *game_thread(void *arg) {
                     int retcode = pthread_barrier_wait(&start_barrier);
                     if(retcode == PTHREAD_BARRIER_SERIAL_THREAD) {
                         // Notify all players
+                        usleep(1000);
                         int status = pthread_kill( board->server_tid, SIGUSR1);
                         if ( status <  0) {
                             perror("Sending Start Signal to server_tid failed");
